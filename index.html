@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Production Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  
+  <style>
+    body { background-color: #f0f2f5; font-family: 'Segoe UI', system-ui, sans-serif; }
+    
+    /* LOADER */
+    #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    
+    /* ORDER CARDS */
+    .order-card { 
+      background: white; border-radius: 12px; padding: 0; 
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; 
+      transition: transform 0.2s; overflow: hidden; position: relative;
+    }
+    .order-card:active { transform: scale(0.98); }
+    
+    .card-status-bar { height: 6px; width: 100%; }
+    .status-running { background-color: #0d6efd; } /* Blue */
+    .status-idle { background-color: #ffc107; }    /* Yellow */
+    .status-done { background-color: #198754; }    /* Green */
+    
+    .card-body-content { padding: 15px; cursor: pointer; }
+
+    /* TIMELINE (Info Modal) */
+    .timeline { border-left: 2px solid #e9ecef; margin-left: 10px; padding-left: 20px; }
+    .timeline-item { position: relative; margin-bottom: 25px; }
+    .timeline-dot { position: absolute; left: -26px; top: 0; width: 14px; height: 14px; border-radius: 50%; background: #0d6efd; border: 2px solid white; box-shadow: 0 0 0 1px #e9ecef; }
+    .timeline-duration { font-size: 0.85rem; background: #e9ecef; padding: 2px 8px; border-radius: 4px; color: #495057; display: inline-block; margin-top: 5px; }
+
+    /* Floating Action Button for New Orders */
+    .fab { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: #0d6efd; color: white; display: flex; justify-content: center; align-items: center; font-size: 24px; box-shadow: 0 4px 10px rgba(13, 110, 253, 0.4); cursor: pointer; z-index: 1000; }
+    
+    /* UTILS */
+    .btn-icon { z-index: 10; position: relative; }
+  </style>
+</head>
+<body>
+
+  <!-- LOADER -->
+  <div id="loader">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="mt-3 text-muted fw-bold">Syncing Orders...</div>
+  </div>
+
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h3 class="fw-bold m-0">Production Floor</h3>
+      <button class="btn btn-outline-secondary btn-sm" onclick="refreshData()"><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+
+    <!-- TABS -->
+    <ul class="nav nav-pills mb-4" id="pills-tab">
+      <li class="nav-item">
+        <button class="nav-link active fw-bold" id="tab-active" data-bs-toggle="pill" data-bs-target="#view-active">In Progress</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link fw-bold" id="tab-history" data-bs-toggle="pill" data-bs-target="#view-history">Completed / Delivered</button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- ACTIVE ORDERS VIEW -->
+      <div class="tab-pane fade show active" id="view-active">
+        <div id="activeContainer"></div>
+        <div id="emptyActive" class="text-center text-muted py-5" style="display:none">
+          <h5>All clear!</h5>
+          <p>No orders in progress. Click + to start.</p>
+        </div>
+      </div>
+
+      <!-- COMPLETED HISTORY VIEW -->
+      <div class="tab-pane fade" id="view-history">
+        <div class="input-group mb-3">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="text" id="searchInput" class="form-control" placeholder="Search history..." onkeyup="renderHistory()">
+        </div>
+        <div id="historyContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING ADD BUTTON -->
+  <div class="fab" onclick="openNewOrderModal()">
+    <i class="bi bi-plus-lg"></i>
+  </div>
+
+  <!-- MODAL: START NEW / NEXT PROCESS -->
+  <div class="modal fade" id="startModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold" id="startModalTitle">Start Process</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <form id="startForm">
+            <div class="mb-3">
+              <label class="fw-bold small text-muted">ORDER NUMBER</label>
+              <input type="text" class="form-control form-control-lg text-uppercase fw-bold" id="inputOrder" required>
+            </div>
+            <div class="mb-3">
+              <label class="fw-bold small text-muted">OPERATOR NAME</label>
+              <input type="text" class="form-control" id="inputName" required>
+            </div>
+            <div class="mb-4">
+              <label class="fw-bold small text-muted">NEXT STEP</label>
+              <select class="form-select form-select-lg" id="inputType" required>
+                <option value="" disabled selected>Select process...</option>
+                <option>Grinding</option><option>Waiting on glass</option><option>Steelworks</option>
+                <option>Rework</option><option>Painting</option><option>Quality control</option>
+                <option>Ready for deliver</option><option>Out for delivery</option><option>Waiting to receive</option>
+                <option>Ready for QC</option><option>Ready for photographs</option><option>Ready for assembly</option>
+                <option>Assembly</option><option>Paint shop</option><option>Job card booked</option>
+                <option>Not yet started</option><option>Hold</option><option>Cutting steel</option>
+                <option>Completed</option><option>At couriers</option><option>Delivered</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-primary w-100 py-3 fw-bold" onclick="submitStart()">START TIMER</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: STOP PROCESS (Nicer Popup) -->
+  <div class="modal fade" id="stopModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title fw-bold">Finish Current Task?</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center p-4">
+          <div class="mb-3">
+             <h2 class="fw-bold mb-0" id="stopOrderDisplay">...</h2>
+             <div class="badge bg-light text-dark mt-2 fs-6" id="stopTypeDisplay">...</div>
+          </div>
+          <p class="text-muted">Operator: <strong id="stopNameDisplay">...</strong></p>
+          <p class="small text-secondary">Clicking "Finish" will stop the timer and mark this step as complete. The order will remain in your list for the next step.</p>
+          
+          <input type="hidden" id="stopTaskId">
+          <button type="button" class="btn btn-danger w-100 py-3 fw-bold shadow-sm" onclick="submitStop()">FINISH TASK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INFO / HISTORY -->
+  <div class="modal fade" id="infoModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="infoTitle">History</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+           <div id="infoTimeline" class="timeline mt-2"></div>
+        </div>
+        <div class="modal-footer bg-light d-flex justify-content-between">
+           <small class="text-muted fw-bold">Total Duration:</small>
+           <span class="fw-bold text-primary" id="infoTotalDuration">0h 0m</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // --- STATE ---
+    let rawRows = [];
+    let groupedOrders = {}; // Key: OrderNum, Value: { currentTask, history: [] }
+    
+    // Modals
+    let startModal, stopModal, infoModal;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      startModal = new bootstrap.Modal(document.getElementById('startModal'));
+      stopModal = new bootstrap.Modal(document.getElementById('stopModal'));
+      infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
+      refreshData();
+    });
+
+    function toggleLoader(show) { document.getElementById('loader').style.display = show ? 'flex' : 'none'; }
+
+    // --- DATA HANDLING ---
+    function refreshData() {
+      toggleLoader(true);
+      google.script.run
+        .withSuccessHandler(processData)
+        .withFailureHandler(err => { alert(err); toggleLoader(false); })
+        .getData();
+    }
+
+    function processData(res) {
+      if(!res.success) { alert(res.error); toggleLoader(false); return; }
+      
+      rawRows = res.rows;
+      groupDataByOrder();
+      renderActive();
+      renderHistory();
+      toggleLoader(false);
+    }
+
+    function groupDataByOrder() {
+      groupedOrders = {};
+      
+      // rawRows sorted by date ascending usually, ensure it
+      rawRows.sort((a,b) => new Date(a.start) - new Date(b.start));
+
+      rawRows.forEach(row => {
+        if (!groupedOrders[row.order]) {
+          groupedOrders[row.order] = { 
+            order: row.order,
+            activeTask: null, // If running
+            lastTask: null,   // The most recent task (running or not)
+            history: [] 
+          };
+        }
+        
+        groupedOrders[row.order].history.push(row);
+        groupedOrders[row.order].lastTask = row;
+        
+        if(row.end === "") {
+          groupedOrders[row.order].activeTask = row;
+        }
+      });
+    }
+
+    // --- RENDERING ---
+    function renderActive() {
+      const container = document.getElementById('activeContainer');
+      const empty = document.getElementById('emptyActive');
+      container.innerHTML = '';
+      
+      const orders = Object.values(groupedOrders);
+      let activeCount = 0;
+
+      // Sort by last activity time (descending)
+      orders.sort((a,b) => new Date(b.lastTask.start) - new Date(a.lastTask.start));
+
+      orders.forEach(group => {
+        // LOGIC: Is this order "Active"?
+        // It is active if:
+        // 1. It has a running task (activeTask != null)
+        // 2. OR The last task was NOT "Delivered" or "Out for delivery"
+        
+        const lastType = group.lastTask.type.toLowerCase();
+        const isComplete = lastType.includes('delivered') || lastType.includes('out for delivery');
+
+        if (!isComplete) {
+          activeCount++;
+          const isRunning = group.activeTask !== null;
+          const statusClass = isRunning ? 'status-running' : 'status-idle';
+          const statusText = isRunning ? 'IN PROGRESS' : 'READY FOR NEXT STEP';
+          const badgeClass = isRunning ? 'bg-primary' : 'bg-warning text-dark';
+          const displayTask = isRunning ? group.activeTask : group.lastTask;
+          
+          const div = document.createElement('div');
+          div.className = 'col-12';
+          div.innerHTML = `
+            <div class="order-card">
+              <div class="card-status-bar ${statusClass}"></div>
+              <div class="d-flex justify-content-between p-3 align-items-center">
+                
+                <!-- Main Click Area -->
+                <div class="flex-grow-1" onclick="handleCardClick('${group.order}')" style="cursor:pointer">
+                  <div class="d-flex justify-content-between mb-1">
+                     <span class="badge ${badgeClass}">${statusText}</span>
+                     ${isRunning ? '<span class="spinner-grow spinner-grow-sm text-primary" role="status"></span>' : ''}
+                  </div>
+                  <h4 class="fw-bold m-0">${group.order}</h4>
+                  <div class="text-muted small">
+                    ${isRunning ? 'Current: ' : 'Last: '} <strong>${displayTask.type}</strong> (${displayTask.name})
+                  </div>
+                </div>
+
+                <!-- Info Button -->
+                <button class="btn btn-light btn-sm btn-icon border rounded-circle ms-3" style="width:40px;height:40px;" onclick="openInfo('${group.order}')">
+                  <i class="bi bi-info-lg"></i>
+                </button>
+              </div>
+            </div>
+          `;
+          container.appendChild(div);
+        }
+      });
+
+      empty.style.display = activeCount === 0 ? 'block' : 'none';
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyContainer');
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      container.innerHTML = '';
+      
+      const orders = Object.values(groupedOrders);
+      
+      // Filter for completed orders matching search
+      const completedOrders = orders.filter(group => {
+        const lastType = group.lastTask.type.toLowerCase();
+        const isComplete = lastType.includes('delivered') || lastType.includes('out for delivery');
+        const matchesSearch = group.order.toLowerCase().includes(search);
+        return isComplete && matchesSearch;
+      });
+
+      // Sort recent first
+      completedOrders.sort((a,b) => new Date(b.lastTask.end) - new Date(a.lastTask.end));
+
+      if(completedOrders.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted mt-4">No matching completed orders.</div>';
+        return;
+      }
+
+      completedOrders.forEach(group => {
+        const div = document.createElement('div');
+        div.className = 'card mb-2 shadow-sm border-0';
+        div.innerHTML = `
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+               <h5 class="fw-bold mb-0">${group.order} <i class="bi bi-check-circle-fill text-success small"></i></h5>
+               <small class="text-muted">Final: ${group.lastTask.type}</small>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openInfo('${group.order}')">View Timeline</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // --- INTERACTION LOGIC ---
+
+    // 1. CLICKING AN ORDER CARD
+    function handleCardClick(orderNum) {
+      const group = groupedOrders[orderNum];
+      
+      if (group.activeTask) {
+        // CASE A: Task is running -> OPEN STOP MODAL
+        document.getElementById('stopTaskId').value = group.activeTask.id;
+        document.getElementById('stopOrderDisplay').innerText = group.order;
+        document.getElementById('stopTypeDisplay').innerText = group.activeTask.type;
+        document.getElementById('stopNameDisplay').innerText = group.activeTask.name;
+        stopModal.show();
+      } else {
+        // CASE B: Idle -> OPEN START MODAL (Pre-filled)
+        document.getElementById('startModalTitle').innerText = "Next Step for " + group.order;
+        document.getElementById('inputOrder').value = group.order;
+        document.getElementById('inputOrder').readOnly = true; // Lock order num
+        document.getElementById('inputName').value = group.lastTask.name; // Pre-fill last name
+        document.getElementById('inputType').value = ""; // Reset type
+        startModal.show();
+      }
+    }
+
+    // 2. CLICKING NEW ORDER BUTTON (FAB)
+    function openNewOrderModal() {
+      document.getElementById('startModalTitle').innerText = "Start New Order";
+      document.getElementById('startForm').reset();
+      document.getElementById('inputOrder').readOnly = false;
+      startModal.show();
+    }
+
+    // 3. SUBMIT START
+    function submitStart() {
+      const form = document.getElementById('startForm');
+      if(!form.checkValidity()) { form.reportValidity(); return; }
+
+      const payload = {
+        orderNumber: document.getElementById('inputOrder').value,
+        employeeName: document.getElementById('inputName').value,
+        workType: document.getElementById('inputType').value
+      };
+
+      startModal.hide();
+      toggleLoader(true);
+
+      google.script.run.withSuccessHandler(() => {
+        refreshData();
+      }).withFailureHandler(err => alert(err)).startTask(payload);
+    }
+
+    // 4. SUBMIT STOP
+    function submitStop() {
+      const id = document.getElementById('stopTaskId').value;
+      stopModal.hide();
+      toggleLoader(true);
+
+      google.script.run.withSuccessHandler(() => {
+        refreshData();
+      }).withFailureHandler(err => alert(err)).endTask(id);
+    }
+
+    // 5. VIEW INFO / TIMELINE
+    function openInfo(orderNum) {
+      const group = groupedOrders[orderNum];
+      const timelineEl = document.getElementById('infoTimeline');
+      timelineEl.innerHTML = '';
+      document.getElementById('infoTitle').innerText = "Order #" + orderNum;
+
+      let firstStart = null;
+      let lastEnd = null;
+
+      group.history.forEach(row => {
+        const s = new Date(row.start);
+        const e = row.end ? new Date(row.end) : null;
+        
+        if(!firstStart) firstStart = s;
+        if(e) lastEnd = e;
+
+        // Calc Duration
+        let durStr = "In Progress";
+        if (e) {
+          const diffMs = e - s;
+          const mins = Math.floor((diffMs/1000)/60);
+          const hrs = Math.floor(mins/60);
+          durStr = (hrs > 0 ? hrs + "h " : "") + (mins % 60) + "m";
+        }
+
+        const div = document.createElement('div');
+        div.className = 'timeline-item';
+        div.innerHTML = `
+          <div class="timeline-dot"></div>
+          <h6 class="fw-bold mb-1">${row.type}</h6>
+          <div class="small text-muted mb-1"><i class="bi bi-person"></i> ${row.name}</div>
+          <div class="small text-secondary">
+             ${s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} 
+             ${e ? ' - ' + e.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}
+          </div>
+          <span class="timeline-duration">${durStr}</span>
+        `;
+        timelineEl.appendChild(div);
+      });
+
+      // Total Duration Calc
+      let totalStr = "Running...";
+      if(group.activeTask === null && firstStart && lastEnd) {
+         const totalMs = lastEnd - firstStart;
+         const days = Math.floor(totalMs / (1000 * 60 * 60 * 24));
+         const hrs = Math.floor((totalMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+         totalStr = (days > 0 ? days + "d " : "") + hrs + "h";
+      }
+      document.getElementById('infoTotalDuration').innerText = totalStr;
+
+      infoModal.show();
+    }
+  </script>
+</body>
+</html>
