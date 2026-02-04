@@ -1,456 +1,412 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
   <base target="_top">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Production Manager</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>Studio Delta</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   
   <style>
-    body { background-color: #f0f2f5; font-family: 'Segoe UI', system-ui, sans-serif; }
+    :root { --sd-bg: #EBEAE6; --sd-text: #1a1a1a; --sd-accent: #000000; --sd-white: #ffffff; }
+    body { background-color: var(--sd-bg); color: var(--sd-text); font-family: 'Lato', sans-serif; overflow-x: hidden; }
+    h1, h2, h3, h4, h5, .brand-font { font-family: 'Playfair Display', serif; color: var(--sd-accent); }
     
-    /* LOADER */
-    #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    /* SIDEBAR */
+    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 250px; background: white; z-index: 1000; transform: translateX(-100%); transition: transform 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.1); padding-top: 60px; }
+    .sidebar.active { transform: translateX(0); }
+    .sidebar-link { display: block; padding: 15px 25px; color: #333; text-decoration: none; font-weight: bold; border-left: 4px solid transparent; }
+    .sidebar-link.active { background: #f8f9fa; border-left-color: black; }
+    .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+    .sidebar-overlay.active { display: block; }
     
-    /* ORDER CARDS */
-    .order-card { 
-      background: white; border-radius: 12px; padding: 0; 
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; 
-      transition: transform 0.2s; overflow: hidden; position: relative;
-    }
-    .order-card:active { transform: scale(0.98); }
-    
-    .card-status-bar { height: 6px; width: 100%; }
-    .status-running { background-color: #0d6efd; } /* Blue */
-    .status-idle { background-color: #ffc107; }    /* Yellow */
-    .status-done { background-color: #198754; }    /* Green */
-    
-    .card-body-content { padding: 15px; cursor: pointer; }
+    /* NAV TOGGLE */
+    .menu-toggle { position: fixed; top: 15px; left: 15px; z-index: 1100; background: white; border: none; padding: 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 
-    /* TIMELINE (Info Modal) */
-    .timeline { border-left: 2px solid #e9ecef; margin-left: 10px; padding-left: 20px; }
-    .timeline-item { position: relative; margin-bottom: 25px; }
-    .timeline-dot { position: absolute; left: -26px; top: 0; width: 14px; height: 14px; border-radius: 50%; background: #0d6efd; border: 2px solid white; box-shadow: 0 0 0 1px #e9ecef; }
-    .timeline-duration { font-size: 0.85rem; background: #e9ecef; padding: 2px 8px; border-radius: 4px; color: #495057; display: inline-block; margin-top: 5px; }
-
-    /* Floating Action Button for New Orders */
-    .fab { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: #0d6efd; color: white; display: flex; justify-content: center; align-items: center; font-size: 24px; box-shadow: 0 4px 10px rgba(13, 110, 253, 0.4); cursor: pointer; z-index: 1000; }
+    /* CARDS & UI */
+    .card { border: none; border-radius: 4px; background-color: var(--sd-white); box-shadow: 0 4px 12px rgba(0,0,0,0.03); transition: all 0.3s ease; }
+    .btn-primary { background-color: var(--sd-accent); border-color: var(--sd-accent); color: var(--sd-white); border-radius: 2px; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; padding: 10px 20px; }
+    .btn-primary:hover { background-color: #333; border-color: #333; }
     
-    /* UTILS */
-    .btn-icon { z-index: 10; position: relative; }
+    .status-bar { height: 4px; width: 100%; }
+    .bar-ready { background-color: #000; } 
+    .bar-running { background-color: #198754; } 
+
+    .d-none-view { display: none !important; }
+    #sigCanvas { border: 1px solid #ccc; width: 100%; height: 200px; }
+    
+    /* Animations */
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-card { animation: slideIn 0.3s ease-out forwards; }
   </style>
 </head>
 <body>
 
-  <!-- LOADER -->
-  <div id="loader">
-    <div class="spinner-border text-primary" role="status"></div>
-    <div class="mt-3 text-muted fw-bold">Syncing Orders...</div>
+  <div id="loader" class="position-fixed top-0 start-0 w-100 h-100 bg-white d-flex flex-column justify-content-center align-items-center" style="z-index:9999;">
+    <h2 class="brand-font mb-3">STUDIO DELTA</h2>
+    <div class="spinner-border text-dark"></div>
   </div>
 
-  <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3 class="fw-bold m-0">Production Floor</h3>
-      <button class="btn btn-outline-secondary btn-sm" onclick="refreshData()"><i class="bi bi-arrow-clockwise"></i></button>
+  <button class="menu-toggle" onclick="toggleSidebar()"><i class="bi bi-list fs-4"></i></button>
+
+  <div class="sidebar" id="sidebar">
+    <div class="px-4 mb-4">
+      <h4 class="brand-font">MENU</h4>
     </div>
-
-    <!-- TABS -->
-    <ul class="nav nav-pills mb-4" id="pills-tab">
-      <li class="nav-item">
-        <button class="nav-link active fw-bold" id="tab-active" data-bs-toggle="pill" data-bs-target="#view-active">In Progress</button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link fw-bold" id="tab-history" data-bs-toggle="pill" data-bs-target="#view-history">Completed / Delivered</button>
-      </li>
-    </ul>
-
-    <div class="tab-content">
-      <!-- ACTIVE ORDERS VIEW -->
-      <div class="tab-pane fade show active" id="view-active">
-        <div id="activeContainer"></div>
-        <div id="emptyActive" class="text-center text-muted py-5" style="display:none">
-          <h5>All clear!</h5>
-          <p>No orders in progress. Click + to start.</p>
-        </div>
-      </div>
-
-      <!-- COMPLETED HISTORY VIEW -->
-      <div class="tab-pane fade" id="view-history">
-        <div class="input-group mb-3">
-          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-          <input type="text" id="searchInput" class="form-control" placeholder="Search history..." onkeyup="renderHistory()">
-        </div>
-        <div id="historyContainer"></div>
-      </div>
+    <a href="#" class="sidebar-link active" onclick="navTo('view-roles')">Home / Roles</a>
+    <div id="adminLinks" class="d-none-view">
+      <a href="#" class="sidebar-link" onclick="loadProductionOverview()">Production Overview</a>
+      <a href="#" class="sidebar-link" onclick="loadWorkerStats()">Worker Information</a>
+    </div>
+    <div class="mt-auto px-4 pt-5">
+      <button class="btn btn-outline-danger w-100" onclick="logout()">Log Out</button>
     </div>
   </div>
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-  <!-- FLOATING ADD BUTTON -->
-  <div class="fab" onclick="openNewOrderModal()">
-    <i class="bi bi-plus-lg"></i>
-  </div>
+  <div class="container-fluid py-5" style="padding-top: 80px;">
+    
+    <div id="view-roles" class="view-section container">
+      <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold">Studio Delta</h1>
+        <p class="text-muted small text-uppercase">Production Management System</p>
+      </div>
+      <div class="row g-3" id="roleGrid"></div>
+    </div>
 
-  <!-- MODAL: START NEW / NEXT PROCESS -->
-  <div class="modal fade" id="startModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title fw-bold" id="startModalTitle">Start Process</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body p-4">
-          <form id="startForm">
-            <div class="mb-3">
-              <label class="fw-bold small text-muted">ORDER NUMBER</label>
-              <input type="text" class="form-control form-control-lg text-uppercase fw-bold" id="inputOrder" required>
-            </div>
-            <div class="mb-3">
-              <label class="fw-bold small text-muted">OPERATOR NAME</label>
-              <input type="text" class="form-control" id="inputName" required>
-            </div>
-            <div class="mb-4">
-              <label class="fw-bold small text-muted">NEXT STEP</label>
-              <select class="form-select form-select-lg" id="inputType" required>
-                <option value="" disabled selected>Select process...</option>
-                <option>Grinding</option><option>Waiting on glass</option><option>Steelworks</option>
-                <option>Rework</option><option>Painting</option><option>Quality control</option>
-                <option>Ready for deliver</option><option>Out for delivery</option><option>Waiting to receive</option>
-                <option>Ready for QC</option><option>Ready for photographs</option><option>Ready for assembly</option>
-                <option>Assembly</option><option>Paint shop</option><option>Job card booked</option>
-                <option>Not yet started</option><option>Hold</option><option>Cutting steel</option>
-                <option>Completed</option><option>At couriers</option><option>Delivered</option>
-              </select>
-            </div>
-            <button type="button" class="btn btn-primary w-100 py-3 fw-bold" onclick="submitStart()">START TIMER</button>
-          </form>
-        </div>
+    <div id="view-users" class="view-section container d-none-view">
+      <button class="btn btn-outline-dark mb-4" onclick="navTo('view-roles')">&larr; BACK</button>
+      <h2 class="mb-4"><span id="selectedRoleTitle"></span> Team</h2>
+      <div class="list-group list-group-flush bg-white rounded shadow-sm" id="userList"></div>
+    </div>
+
+    <div id="view-dashboard" class="view-section container d-none-view">
+      <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+        <div><h4 class="m-0" id="dashUser">User</h4><small class="text-muted text-uppercase" id="dashRole">Role</small></div>
+      </div>
+      <ul class="nav nav-pills nav-fill mb-4 bg-white p-2 rounded shadow-sm" id="dashTabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-available">Available</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-progress">In Progress</button></li>
+      </ul>
+      <div class="text-end mb-2"><button class="btn btn-sm btn-link text-muted text-decoration-none" onclick="loadDashboard()"><i class="bi bi-arrow-clockwise"></i> Refresh</button></div>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="pane-available"><div id="container-available"></div></div>
+        <div class="tab-pane fade" id="pane-progress"><div id="container-progress"></div></div>
       </div>
     </div>
-  </div>
 
-  <!-- MODAL: STOP PROCESS (Nicer Popup) -->
-  <div class="modal fade" id="stopModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-danger text-white">
-          <h5 class="modal-title fw-bold">Finish Current Task?</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <div id="view-admin-prod" class="view-section container d-none-view">
+      <h2 class="brand-font mb-4">Production Overview</h2>
+      <div id="prodOverviewContent"></div>
+    </div>
+
+    <div id="view-admin-workers" class="view-section container d-none-view">
+      <h2 class="brand-font mb-4">Worker Information</h2>
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <div class="list-group" id="workerSelect_List"></div>
         </div>
-        <div class="modal-body text-center p-4">
-          <div class="mb-3">
-             <h2 class="fw-bold mb-0" id="stopOrderDisplay">...</h2>
-             <div class="badge bg-light text-dark mt-2 fs-6" id="stopTypeDisplay">...</div>
+        <div class="col-md-8">
+          <div id="workerDetailContent" class="bg-white p-4 rounded shadow-sm">
+            <p class="text-muted text-center">Select a worker to view stats.</p>
           </div>
-          <p class="text-muted">Operator: <strong id="stopNameDisplay">...</strong></p>
-          <p class="small text-secondary">Clicking "Finish" will stop the timer and mark this step as complete. The order will remain in your list for the next step.</p>
-          
-          <input type="hidden" id="stopTaskId">
-          <button type="button" class="btn btn-danger w-100 py-3 fw-bold shadow-sm" onclick="submitStop()">FINISH TASK</button>
         </div>
       </div>
     </div>
+
   </div>
 
-  <!-- MODAL: INFO / HISTORY -->
-  <div class="modal fade" id="infoModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold" id="infoTitle">History</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-           <div id="infoTimeline" class="timeline mt-2"></div>
-        </div>
-        <div class="modal-footer bg-light d-flex justify-content-between">
-           <small class="text-muted fw-bold">Total Duration:</small>
-           <span class="fw-bold text-primary" id="infoTotalDuration">0h 0m</span>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="modal fade" id="passModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content text-center p-4"><h3 class="mb-3">Access Code</h3><p class="text-muted" id="passPromptName">Enter code</p><input type="password" id="inputPass" class="form-control text-center mb-3" inputmode="numeric"><div id="passError" class="text-danger small fw-bold mb-3"></div><button class="btn btn-primary w-100" onclick="submitPass()">ENTER</button></div></div></div>
+  
+  <div class="modal fade" id="startModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content text-center p-4"><h3 class="brand-font mb-2">Start Order</h3><h1 class="fw-bold text-primary mb-3" id="startModalOrder">...</h1><button class="btn btn-primary btn-lg w-100 mt-3" onclick="confirmStart()">START TIMER</button></div></div></div>
+  
+  <div class="modal fade" id="qcModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title brand-font">Checklist</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><div class="mb-3"><strong>Order:</strong> <span id="qcOrderNum"></span></div><div id="qcChecklistContainer"></div><div class="mt-4"><label class="fw-bold">Signature</label><div class="border"><canvas id="sigCanvas"></canvas></div><button class="btn btn-sm btn-outline-secondary mt-2" onclick="clearSignature()">Clear</button></div></div><div class="modal-footer"><button class="btn btn-primary" onclick="submitQC()">CONFIRM</button></div></div></div></div>
 
-  <!-- JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // --- STATE ---
-    let rawRows = [];
-    let groupedOrders = {}; // Key: OrderNum, Value: { currentTask, history: [] }
-    
-    // Modals
-    let startModal, stopModal, infoModal;
+    let appData = { users: [], workerStats: {} };
+    let session = { role: null, name: null, pendingRow: null, activeOrder: null, logId: null };
+    let refreshInterval = null;
+
+    // --- FULL QC DATA ---
+    const QC_DATA = {
+      'Cutting': [
+        "Does the overall dimensions of the cutting list match the Job Card?",
+        "Are all the items on the cutting list cut?",
+        "Are items cut exactly to size according to the cutting list?",
+        "Have all the angles been cut where indicated?"
+      ],
+      'Tagging': [
+        "Have you read the description on the Job Card?",
+        "Is there a drawing?",
+        "Does the drawing match the description?",
+        "If the drawing did not match, did you notify your supervisor?",
+        "Was mistakes corrected?",
+        "Does the measurements of the cut lengths match the cutting list and drawing?",
+        "Is the frame square after tagging it?",
+        "Are the dimensions of the frame the same as on the Job Card?",
+        "Does the standard glass dimensions fit?",
+        "If the unit is custom, did you measure the custom glass sizes?",
+        "Did you indicate on the job card the custom glass dimensions?"
+      ],
+      'Welding': [
+        "Have you read the description on the Job Card?",
+        "Is there a drawing?",
+        "Does the drawing match the description?",
+        "If the drawing did not match, did you notify your supervisor?",
+        "Were mistakes corrected?",
+        "Does the measurements of the cut lengths match the cutting list and drawing?",
+        "Is the frame square after tagging it?",
+        "Are the dimensions of the frame the same as on the Job Card?",
+        "Does the standard glass dimensions fit?",
+        "Have all the tag spots been welded?",
+        "Have all plates been bent and welded in place?",
+        "Are the plates flush, free from dents and scratches?",
+        "Will the standard glass dimensions fit?",
+        "If there are custom glass dimensions, will it fit?",
+        "Is the frame still square?",
+        "Is your name on the Job Card?"
+      ],
+      'Quality Control': [
+        "Did you read the description on the job card?",
+        "Is there a drawing?",
+        "Does the item match the drawing?",
+        "Does the colour of the item match the description?",
+        "Do you have the top plate for the unit?",
+        "Are there dents on the top plate or scratch marks?",
+        "Is the paint free of defects and scratches?",
+        "Did you report issues with the paint to your supervisor?",
+        "Is the frame square?",
+        "Did you check if the glass fits before putting it in?",
+        "Did you clean the glass before putting it in?"
+      ],
+      'Assembly': [
+        "Did you cut and paint the backboard before fitting the glass?",
+        "Did you fit the glass and make sure the glass clips align?",
+        "Did you fit the handles, magnets and End Caps?",
+        "Are the magnets and handles aligned and free of scratches?",
+        "Did you fit the back board and make sure the screws are hidden?",
+        "Did you wipe down the unit and remove excess silicon?",
+        "Did you place rubber bumpers on the glass shelves and magnets?",
+        "Did you level the unit for QC?",
+        "Did you notify the cleaner that the unit is ready to be cleaned?"
+      ]
+    };
+
+    let passModal, startModal, qcModal, canvas, ctx, isDrawing = false;
 
     document.addEventListener('DOMContentLoaded', () => {
-      startModal = new bootstrap.Modal(document.getElementById('startModal'));
-      stopModal = new bootstrap.Modal(document.getElementById('stopModal'));
-      infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
-      refreshData();
+      passModal = new bootstrap.Modal('#passModal');
+      startModal = new bootstrap.Modal('#startModal');
+      qcModal = new bootstrap.Modal('#qcModal');
+      initSigPad();
+      initApp();
     });
 
-    function toggleLoader(show) { document.getElementById('loader').style.display = show ? 'flex' : 'none'; }
-
-    // --- DATA HANDLING ---
-    function refreshData() {
-      toggleLoader(true);
-      google.script.run
-        .withSuccessHandler(processData)
-        .withFailureHandler(err => { alert(err); toggleLoader(false); })
-        .getData();
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('active');
+      document.getElementById('sidebarOverlay').classList.toggle('active');
     }
 
-    function processData(res) {
-      if(!res.success) { alert(res.error); toggleLoader(false); return; }
+    function navTo(viewId) {
+      document.querySelectorAll('.view-section').forEach(el => el.classList.add('d-none-view'));
+      document.getElementById(viewId).classList.remove('d-none-view');
+      document.getElementById('sidebar').classList.remove('active');
+      document.getElementById('sidebarOverlay').classList.remove('active');
       
-      rawRows = res.rows;
-      groupDataByOrder();
-      renderActive();
-      renderHistory();
-      toggleLoader(false);
+      // Stop refresh if leaving dashboard
+      if(viewId !== 'view-dashboard') stopAutoRefresh();
     }
 
-    function groupDataByOrder() {
-      groupedOrders = {};
-      
-      // rawRows sorted by date ascending usually, ensure it
-      rawRows.sort((a,b) => new Date(a.start) - new Date(b.start));
+    function initApp() {
+      google.script.run.withSuccessHandler(data => {
+        appData.users = data; renderRoles(); 
+        document.getElementById('loader').classList.add('d-none');
+      }).getUsersAndRoles();
+    }
 
-      rawRows.forEach(row => {
-        if (!groupedOrders[row.order]) {
-          groupedOrders[row.order] = { 
-            order: row.order,
-            activeTask: null, // If running
-            lastTask: null,   // The most recent task (running or not)
-            history: [] 
-          };
-        }
-        
-        groupedOrders[row.order].history.push(row);
-        groupedOrders[row.order].lastTask = row;
-        
-        if(row.end === "") {
-          groupedOrders[row.order].activeTask = row;
-        }
+    function renderRoles() {
+      const grid = document.getElementById('roleGrid'); grid.innerHTML = '';
+      [...new Set(appData.users.map(u => u.role))].sort().forEach(r => {
+        grid.innerHTML += `<div class="col-md-4"><div class="card p-4 text-center h-100 role-card" onclick="selectRole('${r}')"><h4>${r}</h4></div></div>`;
       });
     }
 
-    // --- RENDERING ---
-    function renderActive() {
-      const container = document.getElementById('activeContainer');
-      const empty = document.getElementById('emptyActive');
-      container.innerHTML = '';
-      
-      const orders = Object.values(groupedOrders);
-      let activeCount = 0;
+    function selectRole(r) { session.role = r; r.toLowerCase() === 'admin' ? promptPass('Admin') : renderUsers(r); }
+    function renderUsers(r) {
+      const list = document.getElementById('userList'); document.getElementById('selectedRoleTitle').innerText = r; list.innerHTML = '';
+      appData.users.filter(u => u.role === r).forEach(u => list.innerHTML += `<button class="list-group-item list-group-item-action py-3 fw-bold" onclick="promptPass('${u.name}')">${u.name}</button>`);
+      navTo('view-users');
+    }
+    function promptPass(n) { session.name = n; document.getElementById('passPromptName').innerText = "Code for " + n; document.getElementById('inputPass').value=''; passModal.show(); }
 
-      // Sort by last activity time (descending)
-      orders.sort((a,b) => new Date(b.lastTask.start) - new Date(a.lastTask.start));
+    function submitPass() {
+      const p = document.getElementById('inputPass').value;
+      google.script.run.withSuccessHandler(res => {
+        if(res.success) { 
+          passModal.hide(); 
+          if(session.role === 'Admin') {
+            document.getElementById('adminLinks').classList.remove('d-none-view');
+            loadProductionOverview();
+          } else {
+            enterDashboard();
+          }
+        } else alert(res.error);
+      }).verifyLogin(session.role, session.name, p);
+    }
+    
+    function logout() { 
+      session = {}; document.getElementById('adminLinks').classList.add('d-none-view'); navTo('view-roles'); 
+    }
 
-      orders.forEach(group => {
-        // LOGIC: Is this order "Active"?
-        // It is active if:
-        // 1. It has a running task (activeTask != null)
-        // 2. OR The last task was NOT "Delivered" or "Out for delivery"
-        
-        const lastType = group.lastTask.type.toLowerCase();
-        const isComplete = lastType.includes('delivered') || lastType.includes('out for delivery');
+    // --- WORKER DASHBOARD ---
+    function enterDashboard() {
+      navTo('view-dashboard');
+      document.getElementById('dashUser').innerText = session.name;
+      document.getElementById('dashRole').innerText = session.role;
+      // Default to Available Tab
+      const tabEl = document.querySelector('#dashTabs button[data-bs-target="#pane-available"]');
+      if(tabEl) new bootstrap.Tab(tabEl).show();
+      loadDashboard(false);
+      startAutoRefresh();
+    }
 
-        if (!isComplete) {
-          activeCount++;
-          const isRunning = group.activeTask !== null;
-          const statusClass = isRunning ? 'status-running' : 'status-idle';
-          const statusText = isRunning ? 'IN PROGRESS' : 'READY FOR NEXT STEP';
-          const badgeClass = isRunning ? 'bg-primary' : 'bg-warning text-dark';
-          const displayTask = isRunning ? group.activeTask : group.lastTask;
+    function startAutoRefresh() {
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => {
+        if (!document.querySelector('.modal.show')) loadDashboard(true);
+      }, 30000); 
+    }
+    function stopAutoRefresh() { if (refreshInterval) clearInterval(refreshInterval); }
+
+    function loadDashboard(silent = false) {
+      if(!silent) document.getElementById('container-available').innerHTML = '<div class="spinner-border"></div>';
+      google.script.run.withSuccessHandler(orders => {
+        const av = document.getElementById('container-available'); const pr = document.getElementById('container-progress');
+        av.innerHTML = ''; pr.innerHTML = '';
+        orders.forEach(o => {
+          const isMine = o.assigned === session.name;
+          const isLocked = o.assigned && !isMine;
+          const cardId = `card-${o.rowIndex}`;
+          let btn = isMine ? `<button class="btn btn-success w-100" onclick="preFinish(${o.rowIndex}, '${o.order}')">FINISH & QC</button>` : 
+                    isLocked ? `<button class="btn btn-secondary w-100" disabled>LOCKED BY ${o.assigned}</button>` : 
+                    `<button class="btn btn-primary w-100" onclick="preStart(${o.rowIndex}, '${o.order}')">START</button>`;
           
-          const div = document.createElement('div');
-          div.className = 'col-12';
-          div.innerHTML = `
-            <div class="order-card">
-              <div class="card-status-bar ${statusClass}"></div>
-              <div class="d-flex justify-content-between p-3 align-items-center">
-                
-                <!-- Main Click Area -->
-                <div class="flex-grow-1" onclick="handleCardClick('${group.order}')" style="cursor:pointer">
-                  <div class="d-flex justify-content-between mb-1">
-                     <span class="badge ${badgeClass}">${statusText}</span>
-                     ${isRunning ? '<span class="spinner-grow spinner-grow-sm text-primary" role="status"></span>' : ''}
-                  </div>
-                  <h4 class="fw-bold m-0">${group.order}</h4>
-                  <div class="text-muted small">
-                    ${isRunning ? 'Current: ' : 'Last: '} <strong>${displayTask.type}</strong> (${displayTask.name})
-                  </div>
-                </div>
-
-                <!-- Info Button -->
-                <button class="btn btn-light btn-sm btn-icon border rounded-circle ms-3" style="width:40px;height:40px;" onclick="openInfo('${group.order}')">
-                  <i class="bi bi-info-lg"></i>
-                </button>
-              </div>
-            </div>
-          `;
-          container.appendChild(div);
-        }
-      });
-
-      empty.style.display = activeCount === 0 ? 'block' : 'none';
+          const html = `<div class="card mb-3 animate-card" id="${cardId}"><div class="status-bar ${isMine?'bar-running':(isLocked?'bar-locked':'bar-ready')}"></div><div class="card-body"><div class="d-flex justify-content-between mb-2"><h4>${o.order}</h4><span class="badge bg-dark">${o.status}</span></div>${btn}</div></div>`;
+          isMine ? pr.innerHTML += html : av.innerHTML += html;
+        });
+      }).getOrdersForRole(session.role);
     }
-
-    function renderHistory() {
-      const container = document.getElementById('historyContainer');
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      container.innerHTML = '';
-      
-      const orders = Object.values(groupedOrders);
-      
-      // Filter for completed orders matching search
-      const completedOrders = orders.filter(group => {
-        const lastType = group.lastTask.type.toLowerCase();
-        const isComplete = lastType.includes('delivered') || lastType.includes('out for delivery');
-        const matchesSearch = group.order.toLowerCase().includes(search);
-        return isComplete && matchesSearch;
-      });
-
-      // Sort recent first
-      completedOrders.sort((a,b) => new Date(b.lastTask.end) - new Date(a.lastTask.end));
-
-      if(completedOrders.length === 0) {
-        container.innerHTML = '<div class="text-center text-muted mt-4">No matching completed orders.</div>';
-        return;
-      }
-
-      completedOrders.forEach(group => {
-        const div = document.createElement('div');
-        div.className = 'card mb-2 shadow-sm border-0';
-        div.innerHTML = `
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-               <h5 class="fw-bold mb-0">${group.order} <i class="bi bi-check-circle-fill text-success small"></i></h5>
-               <small class="text-muted">Final: ${group.lastTask.type}</small>
-            </div>
-            <button class="btn btn-sm btn-outline-secondary" onclick="openInfo('${group.order}')">View Timeline</button>
-          </div>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    // --- INTERACTION LOGIC ---
-
-    // 1. CLICKING AN ORDER CARD
-    function handleCardClick(orderNum) {
-      const group = groupedOrders[orderNum];
-      
-      if (group.activeTask) {
-        // CASE A: Task is running -> OPEN STOP MODAL
-        document.getElementById('stopTaskId').value = group.activeTask.id;
-        document.getElementById('stopOrderDisplay').innerText = group.order;
-        document.getElementById('stopTypeDisplay').innerText = group.activeTask.type;
-        document.getElementById('stopNameDisplay').innerText = group.activeTask.name;
-        stopModal.show();
-      } else {
-        // CASE B: Idle -> OPEN START MODAL (Pre-filled)
-        document.getElementById('startModalTitle').innerText = "Next Step for " + group.order;
-        document.getElementById('inputOrder').value = group.order;
-        document.getElementById('inputOrder').readOnly = true; // Lock order num
-        document.getElementById('inputName').value = group.lastTask.name; // Pre-fill last name
-        document.getElementById('inputType').value = ""; // Reset type
-        startModal.show();
-      }
-    }
-
-    // 2. CLICKING NEW ORDER BUTTON (FAB)
-    function openNewOrderModal() {
-      document.getElementById('startModalTitle').innerText = "Start New Order";
-      document.getElementById('startForm').reset();
-      document.getElementById('inputOrder').readOnly = false;
-      startModal.show();
-    }
-
-    // 3. SUBMIT START
-    function submitStart() {
-      const form = document.getElementById('startForm');
-      if(!form.checkValidity()) { form.reportValidity(); return; }
-
-      const payload = {
-        orderNumber: document.getElementById('inputOrder').value,
-        employeeName: document.getElementById('inputName').value,
-        workType: document.getElementById('inputType').value
-      };
-
+    
+    // OPTIMISTIC START
+    function preStart(row, ord) { session.pendingRow = row; session.activeOrder = ord; document.getElementById('startModalOrder').innerText = ord; startModal.show(); }
+    
+    function confirmStart() {
       startModal.hide();
-      toggleLoader(true);
-
-      google.script.run.withSuccessHandler(() => {
-        refreshData();
-      }).withFailureHandler(err => alert(err)).startTask(payload);
-    }
-
-    // 4. SUBMIT STOP
-    function submitStop() {
-      const id = document.getElementById('stopTaskId').value;
-      stopModal.hide();
-      toggleLoader(true);
-
-      google.script.run.withSuccessHandler(() => {
-        refreshData();
-      }).withFailureHandler(err => alert(err)).endTask(id);
-    }
-
-    // 5. VIEW INFO / TIMELINE
-    function openInfo(orderNum) {
-      const group = groupedOrders[orderNum];
-      const timelineEl = document.getElementById('infoTimeline');
-      timelineEl.innerHTML = '';
-      document.getElementById('infoTitle').innerText = "Order #" + orderNum;
-
-      let firstStart = null;
-      let lastEnd = null;
-
-      group.history.forEach(row => {
-        const s = new Date(row.start);
-        const e = row.end ? new Date(row.end) : null;
-        
-        if(!firstStart) firstStart = s;
-        if(e) lastEnd = e;
-
-        // Calc Duration
-        let durStr = "In Progress";
-        if (e) {
-          const diffMs = e - s;
-          const mins = Math.floor((diffMs/1000)/60);
-          const hrs = Math.floor(mins/60);
-          durStr = (hrs > 0 ? hrs + "h " : "") + (mins % 60) + "m";
-        }
-
-        const div = document.createElement('div');
-        div.className = 'timeline-item';
-        div.innerHTML = `
-          <div class="timeline-dot"></div>
-          <h6 class="fw-bold mb-1">${row.type}</h6>
-          <div class="small text-muted mb-1"><i class="bi bi-person"></i> ${row.name}</div>
-          <div class="small text-secondary">
-             ${s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} 
-             ${e ? ' - ' + e.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}
-          </div>
-          <span class="timeline-duration">${durStr}</span>
-        `;
-        timelineEl.appendChild(div);
-      });
-
-      // Total Duration Calc
-      let totalStr = "Running...";
-      if(group.activeTask === null && firstStart && lastEnd) {
-         const totalMs = lastEnd - firstStart;
-         const days = Math.floor(totalMs / (1000 * 60 * 60 * 24));
-         const hrs = Math.floor((totalMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-         totalStr = (days > 0 ? days + "d " : "") + hrs + "h";
+      // UI Update Immediate
+      const card = document.getElementById(`card-${session.pendingRow}`);
+      if(card) {
+        card.querySelector('.status-bar').className = 'status-bar bar-running';
+        card.querySelector('button').parentNode.innerHTML = `<button class="btn btn-success w-100" disabled>SYNCING...</button>`;
+        document.getElementById('container-progress').appendChild(card);
+        new bootstrap.Tab(document.querySelector('#dashTabs button[data-bs-target="#pane-progress"]')).show();
       }
-      document.getElementById('infoTotalDuration').innerText = totalStr;
-
-      infoModal.show();
+      google.script.run.withSuccessHandler(res => { 
+        session.logId = res.logId; 
+        // Silent refresh to confirm state
+        loadDashboard(true); 
+      }).startOrder(session.pendingRow, session.name, session.role);
     }
+    
+    function preFinish(row, ord) { 
+      session.pendingRow = row; session.activeOrder = ord; 
+      if(session.role === 'Grinding') { if(confirm("Finish Grinding?")) submitQC(true); return; }
+      
+      // Build Full QC Checklist
+      const qs = QC_DATA[session.role] || QC_DATA['Quality Control'];
+      let h = ''; 
+      qs.forEach((q,i) => {
+        h += `<div class="mb-3 border-bottom pb-2"><div class="fw-bold mb-1">${q}</div><div class="btn-group w-100" role="group"><input type="radio" class="btn-check" name="q${i}" id="q${i}y" value="Y" autocomplete="off"><label class="btn btn-outline-success" for="q${i}y">YES</label><input type="radio" class="btn-check" name="q${i}" id="q${i}n" value="N" autocomplete="off"><label class="btn btn-outline-danger" for="q${i}n">NO</label></div></div>`;
+      });
+      document.getElementById('qcChecklistContainer').innerHTML = h;
+      document.getElementById('qcOrderNum').innerText = ord; clearSignature(); qcModal.show();
+    }
+
+    function submitQC(skip=false) {
+      let d = [], sig = '';
+      if(!skip) {
+        const qs = QC_DATA[session.role] || QC_DATA['Quality Control'];
+        let allAnswered = true;
+        qs.forEach((q,i) => { 
+          const el = document.querySelector(`input[name="q${i}"]:checked`); 
+          if(!el) allAnswered=false; 
+          else d.push({q:q, a:el.value}); 
+        });
+        if(!allAnswered) { alert("Please answer all questions."); return; }
+        sig = canvas.toDataURL();
+      }
+      qcModal.hide();
+      
+      // Optimistic Remove
+      const card = document.getElementById(`card-${session.pendingRow}`);
+      if(card) { card.style.opacity='0.5'; setTimeout(()=>card.remove(), 500); }
+      
+      google.script.run.withSuccessHandler(() => loadDashboard(true)).finishOrder(session.pendingRow, session.logId, d, sig);
+    }
+
+    // --- ADMIN VIEWS ---
+    function loadProductionOverview() {
+      navTo('view-admin-prod');
+      document.getElementById('prodOverviewContent').innerHTML = '<div class="spinner-border"></div>';
+      google.script.run.withSuccessHandler(data => {
+        let h = '<div class="table-responsive"><table class="table table-striped table-hover"><thead><tr><th>Order</th><th>Worker</th><th>Task</th><th>Start</th><th>End</th><th>Duration (Mins)</th><th>QC</th></tr></thead><tbody>';
+        data.forEach(r => {
+          let s = r.start ? new Date(r.start).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '-';
+          let e = r.end ? new Date(r.end).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Running';
+          h += `<tr><td>${r.order}</td><td>${r.worker}</td><td>${r.task}</td><td>${s}</td><td>${e}</td><td>${r.durationMins}</td><td><small>${r.qc||''}</small></td></tr>`;
+        });
+        h += '</tbody></table></div>';
+        document.getElementById('prodOverviewContent').innerHTML = h;
+      }).getProductionOverview();
+    }
+
+    function loadWorkerStats() {
+      navTo('view-admin-workers');
+      google.script.run.withSuccessHandler(workers => {
+        appData.workerStats = workers;
+        let h = '';
+        Object.keys(workers).forEach(name => {
+          h += `<button class="list-group-item list-group-item-action" onclick="showWorkerDetail('${name}')">${name}</button>`;
+        });
+        document.getElementById('workerSelect_List').innerHTML = h;
+      }).getWorkerStats();
+    }
+
+    function showWorkerDetail(name) {
+      const w = appData.workerStats[name];
+      let h = `<h4>${name}</h4><h5 class="text-primary mb-3">Total Time: ${(w.totalMins/60).toFixed(1)} hrs</h5>`;
+      h += '<ul class="list-group list-group-flush">';
+      w.logs.forEach(l => {
+        let d = l.start ? new Date(l.start).toLocaleDateString() : '';
+        h += `<li class="list-group-item d-flex justify-content-between"><div><strong>${l.order}</strong> - ${l.task} <br><small class="text-muted">${d}</small></div><span>${l.duration} min</span></li>`;
+      });
+      h += '</ul>';
+      document.getElementById('workerDetailContent').innerHTML = h;
+    }
+
+    // Sig Pad
+    function initSigPad() {
+      canvas = document.getElementById('sigCanvas'); ctx = canvas.getContext('2d');
+      ctx.lineWidth=2; canvas.addEventListener('mousedown', sD); canvas.addEventListener('mousemove', dD); canvas.addEventListener('mouseup', () => isDrawing=false);
+      canvas.addEventListener('touchstart', e=>{e.preventDefault();sD(e.touches[0])}); canvas.addEventListener('touchmove', e=>{e.preventDefault();dD(e.touches[0])});
+    }
+    function sD(e) { isDrawing=true; const r=canvas.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(e.clientX-r.left, e.clientY-r.top); }
+    function dD(e) { if(!isDrawing)return; const r=canvas.getBoundingClientRect(); ctx.lineTo(e.clientX-r.left, e.clientY-r.top); ctx.stroke(); }
+    function clearSignature() { ctx.clearRect(0,0,canvas.width,canvas.height); }
   </script>
 </body>
 </html>
