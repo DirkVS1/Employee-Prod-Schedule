@@ -164,23 +164,42 @@ function getWorkerStats() {
   data.forEach(row => {
     var name = row[2];
     if (!name) return;
-    if (!workers[name]) workers[name] = { totalMins: 0, logs: [] };
+    if (!workers[name]) workers[name] = { totalMins: 0, weeklyMins: {}, logs: [] };
     
     var start = row[5] ? new Date(row[5]) : null;
     var end = row[6] ? new Date(row[6]) : null;
     var duration = calculateWorkMinutes(start, end);
     
     workers[name].totalMins += duration;
+    
+    // Calculate week key (ISO week)
+    if (start) {
+      var weekKey = getWeekKey(start);
+      if (!workers[name].weeklyMins[weekKey]) workers[name].weeklyMins[weekKey] = 0;
+      workers[name].weeklyMins[weekKey] += duration;
+    }
+    
     workers[name].logs.push({
       task: row[4],
       order: row[1],
       start: start,
       end: end,
-      duration: duration
+      duration: duration,
+      role: row[3]
     });
   });
   
   return workers;
+}
+
+// Helper to get ISO week key (YYYY-Wxx)
+function getWeekKey(date) {
+  var d = new Date(date.getTime());
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  var week1 = new Date(d.getFullYear(), 0, 4);
+  var weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+  return d.getFullYear() + '-W' + (weekNum < 10 ? '0' : '') + weekNum;
 }
 
 // --- UTILS ---
