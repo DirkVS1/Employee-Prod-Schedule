@@ -193,11 +193,16 @@ function getWorkerStats() {
 }
 
 // Helper to get ISO week key (YYYY-Wxx)
+// ISO week calculation: Week 1 is the first week with a Thursday in it
+// Algorithm adjusts date to Thursday of the same week, then calculates week number
 function getWeekKey(date) {
   var d = new Date(date.getTime());
   d.setHours(0, 0, 0, 0);
+  // Set to Thursday of the current week (ISO week starts on Monday)
   d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  // Get first Thursday of the year (week 1)
   var week1 = new Date(d.getFullYear(), 0, 4);
+  // Calculate week number: days between divided by 7, adjusted for day of week
   var weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
   return d.getFullYear() + '-W' + (weekNum < 10 ? '0' : '') + weekNum;
 }
