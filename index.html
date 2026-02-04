@@ -13,9 +13,62 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   
   <style>
-    :root { --sd-bg: #EBEAE6; --sd-text: #1a1a1a; --sd-accent: #000000; --sd-white: #ffffff; }
-    body { background-color: var(--sd-bg); color: var(--sd-text); font-family: 'Lato', sans-serif; overflow-x: hidden; }
-    h1, h2, h3, h4, h5, .brand-font { font-family: 'Playfair Display', serif; color: var(--sd-accent); }
+    :root { 
+      --sd-bg: #EBEAE6; 
+      --sd-text: #1a1a1a; 
+      --sd-accent: #000000; 
+      --sd-white: #ffffff;
+      --sd-shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+      --sd-shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+      --sd-shadow-lg: 0 6px 20px rgba(0,0,0,0.12);
+      --sd-transition: all 0.2s ease;
+    }
+    body { 
+      background-color: var(--sd-bg); 
+      color: var(--sd-text); 
+      font-family: 'Lato', sans-serif; 
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+    h1, h2, h3, h4, h5, .brand-font { 
+      font-family: 'Playfair Display', serif; 
+      color: var(--sd-accent);
+      line-height: 1.3;
+    }
+    
+    /* Input fields improvements */
+    .form-control {
+      border-radius: 8px;
+      border: 2px solid #dee2e6;
+      padding: 12px 16px;
+      transition: var(--sd-transition);
+    }
+    .form-control:focus {
+      border-color: var(--sd-accent);
+      box-shadow: 0 0 0 0.2rem rgba(0,0,0,0.1);
+    }
+    
+    /* Search input with icon */
+    #dashSearch, #prodSearch {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23999' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 12px center;
+      background-size: 16px 16px;
+      padding-left: 40px;
+    }
+    
+    /* Badge improvements */
+    .badge {
+      padding: 6px 12px;
+      font-weight: 500;
+      border-radius: 6px;
+    }
+    
+    /* Loading spinner */
+    .spinner-border {
+      margin: 40px auto;
+      display: block;
+    }
     
 /* SIDEBAR */
     .sidebar { 
@@ -23,50 +76,82 @@
         top: 0; 
         left: 0; 
         height: 100vh; 
-        width: 260px; 
+        width: 280px; 
         background: white; 
-        z-index: 1100; /* Increased to sit ABOVE the mobile header */
+        z-index: 1100; 
         transform: translateX(-100%); 
         transition: transform 0.3s ease; 
-        box-shadow: 2px 0 10px rgba(0,0,0,0.1); 
-        padding-top: 20px; /* Reset padding, button handles spacing now */
+        box-shadow: 2px 0 10px rgba(0,0,0,0.15); 
+        padding-top: 20px; 
+        overflow-y: auto;
     }
     .sidebar.active { transform: translateX(0); }
+    
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1050;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .sidebar-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
 
-    /* RESTORED LINK STYLING */
+    /* SIDEBAR LINKS */
     .sidebar-link { 
         display: block; 
-        padding: 15px 25px; 
+        padding: 16px 28px; 
         color: #333; 
         text-decoration: none; 
-        font-weight: bold; 
+        font-weight: 500; 
+        font-size: 15px;
         border-left: 4px solid transparent; 
         cursor: pointer; 
-        transition: all 0.2s;
+        transition: all 0.2s ease;
+        margin-bottom: 4px;
     }
-    .sidebar-link:hover { background-color: #f0f0f0; }
-    .sidebar-link.active { background: #f8f9fa; border-left-color: black; }
+    .sidebar-link:hover { 
+        background-color: #f5f5f5; 
+        color: #000;
+    }
+    .sidebar-link.active { 
+        background: #f8f9fa; 
+        border-left-color: black;
+        font-weight: 600;
+    }
 
     /* MENU BUTTON */
     .menu-toggle { 
         position: fixed; 
         top: 20px; 
-        left: 25px; 
-        z-index: 1200; /* Highest priority */
+        left: 20px; 
+        z-index: 1200; 
         background: white; 
         border: none; 
-        padding: 10px 14px; 
-        border-radius: 50%; 
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-        transition: left 0.3s ease, background 0.3s ease, transform 0.2s; /* Animate movement */
+        padding: 12px 16px; 
+        border-radius: 8px; 
+        box-shadow: 0 2px 12px rgba(0,0,0,0.15); 
+        transition: all 0.3s ease;
+        cursor: pointer;
     }
 
-    .menu-toggle:hover { transform: scale(1.1); background: #f8f9fa; }
+    .menu-toggle:hover { 
+        transform: scale(1.05); 
+        background: #f8f9fa;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2); 
+    }
 
-    /* WHEN MENU IS OPEN - MOVE BUTTON RIGHT */
+    /* WHEN MENU IS OPEN - MOVE BUTTON */
     .menu-toggle.active {
-        left: 205px !important; /* Moves inside the sidebar (260px width) */
-        background: transparent; /* Blends into sidebar */
+        left: 225px !important;
+        background: transparent;
         box-shadow: none; 
     }
 
@@ -75,28 +160,100 @@
         /* Glass Header */
         body::before {
             content: '';
-            position: fixed; top: 0; left: 0; width: 100%; height: 65px; 
-            background: rgba(255, 255, 255, 0.95); 
-            backdrop-filter: blur(5px); 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 70px; 
+            background: rgba(255, 255, 255, 0.97); 
+            backdrop-filter: blur(8px); 
             z-index: 1050; 
             border-bottom: 1px solid #e0e0e0;
             display: block;
         }
 
-        /* Default Mobile Button Position */
+        /* Mobile Button Position */
         .menu-toggle {
-            top: 10px;
+            top: 15px;
             left: 15px;
-            box-shadow: none; 
-            background: transparent; 
+            padding: 10px 14px;
+            border-radius: 8px;
         }
 
         /* Content spacing */
-        .container-fluid { padding-top: 90px !important; }
+        .container-fluid { 
+            padding-top: 95px !important; 
+            padding-left: 15px !important;
+            padding-right: 15px !important;
+        }
+        
+        /* Sidebar width on mobile */
+        .sidebar {
+            width: 280px;
+        }
+        
+        /* Card improvements on mobile */
+        .card {
+            margin-bottom: 16px !important;
+        }
+        
+        .card-body {
+            padding: 16px !important;
+        }
+        
+        /* Button improvements */
+        .btn {
+            padding: 12px 16px !important;
+            font-size: 15px !important;
+        }
+        
+        /* Role cards on mobile */
+        #roleGrid .col-md-4 {
+            margin-bottom: 12px;
+        }
+        
+        /* Improve modal spacing */
+        .modal-content {
+            margin: 10px;
+        }
+        
+        .modal-dialog-centered {
+            padding: 10px;
+        }
+        
+        .modal-lg {
+            max-width: calc(100% - 20px);
+        }
+        
+        /* Better table responsiveness */
+        .table-responsive {
+            font-size: 14px;
+        }
+        
+        /* QC checklist improvements */
+        #qcChecklistContainer {
+            max-height: 50vh;
+            overflow-y: auto;
+        }
     }
 
     @media (min-width: 769px) {
         body::before { display: none; }
+        
+        /* Desktop spacing */
+        .container {
+            max-width: 1200px;
+        }
+        
+        /* Better card layouts */
+        .card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        }
     }
     
     /* BUTTONS */
@@ -104,21 +261,125 @@
         background-color: #000000 !important;
         border-color: #000000 !important;
         color: #ffffff !important;
+        font-weight: 500;
+        padding: 10px 20px;
+        transition: all 0.2s ease;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
     }
     .btn-outline-dark, .btn-outline-dark:hover {
         border-color: #000000 !important;
         color: #000000 !important;
+        font-weight: 500;
+        padding: 10px 20px;
+        transition: all 0.2s ease;
     }
-    .nav-pills .nav-link.active { background-color: #000000 !important; color: white !important; }
-    .nav-pills .nav-link { color: #555 !important; font-weight: bold; }
+    .btn-outline-dark:hover {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+    }
+    .nav-pills .nav-link.active { 
+        background-color: #000000 !important; 
+        color: white !important;
+        font-weight: 500;
+    }
+    .nav-pills .nav-link { 
+        color: #555 !important; 
+        font-weight: 500;
+        padding: 10px 16px;
+        transition: all 0.2s ease;
+    }
+    .nav-pills .nav-link:hover {
+        background-color: #f5f5f5;
+    }
 
-    /* DASHBOARD */
-    .status-bar { height: 4px; width: 100%; }
+    /* DASHBOARD & CARDS */
+    .status-bar { height: 5px; width: 100%; border-radius: 4px 4px 0 0; }
     .bar-ready { background-color: #000; } 
     .bar-running { background-color: #198754; } 
     .bar-locked { background-color: #dc3545; }
     .d-none-view { display: none !important; }
-    #sigCanvas { border: 1px solid #ccc; width: 100%; height: 200px; touch-action: none; background-color: white; }
+    
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 16px;
+        overflow: hidden;
+    }
+    
+    .card-body {
+        padding: 20px;
+    }
+    
+    .card-header {
+        padding: 16px 20px;
+    }
+    
+    .card h4 {
+        margin-bottom: 12px;
+        font-weight: 600;
+    }
+    
+    .role-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .role-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+    
+    .list-group-item {
+        border-left: 3px solid transparent;
+        transition: all 0.2s ease;
+        padding: 16px 20px;
+    }
+    
+    .list-group-item:hover {
+        border-left-color: #000;
+        background-color: #f8f9fa;
+    }
+    
+    /* Accordion improvements */
+    .accordion .card {
+        margin-bottom: 12px;
+    }
+    
+    /* Table improvements */
+    .table {
+        font-size: 14px;
+    }
+    
+    .table thead th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .table tbody tr {
+        transition: background-color 0.15s ease;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    #sigCanvas { 
+        border: 2px solid #dee2e6; 
+        border-radius: 8px;
+        width: 100%; 
+        height: 200px; 
+        touch-action: none; 
+        background-color: white; 
+    }
     
     .live-timer { font-variant-numeric: tabular-nums; }
     @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -137,48 +398,82 @@
   <button class="menu-toggle" onclick="toggleSidebar()"><i class="bi bi-list fs-4"></i></button>
 
   <div class="sidebar" id="sidebar">
-    <div class="px-4 mb-4 mt-5"><h4 class="brand-font">MENU</h4></div>
-    <a id="link-roles" class="sidebar-link active" onclick="navTo('view-roles')">Home / Roles</a>
-    <div id="adminLinks" class="d-none-view">
-      <a id="link-prod" class="sidebar-link" onclick="loadProductionOverview()">Production Overview</a>
-      <a id="link-work" class="sidebar-link" onclick="loadWorkerStats()">Worker Information</a>
+    <div class="px-4 mb-4 mt-4">
+      <h4 class="brand-font mb-0">MENU</h4>
     </div>
-    <div class="mt-auto px-4 pt-5"><button class="btn btn-outline-danger w-100" onclick="logout()">Log Out</button></div>
+    <nav>
+      <a id="link-roles" class="sidebar-link active" onclick="navTo('view-roles')">
+        <i class="bi bi-house-door me-2"></i>Home / Roles
+      </a>
+      <div id="adminLinks" class="d-none-view">
+        <a id="link-prod" class="sidebar-link" onclick="loadProductionOverview()">
+          <i class="bi bi-kanban me-2"></i>Production Overview
+        </a>
+        <a id="link-work" class="sidebar-link" onclick="loadWorkerStats()">
+          <i class="bi bi-people me-2"></i>Worker Information
+        </a>
+      </div>
+    </nav>
+    <div class="mt-auto px-4 pt-5 pb-4">
+      <button class="btn btn-outline-danger w-100 py-2" onclick="logout()">
+        <i class="bi bi-box-arrow-right me-2"></i>Log Out
+      </button>
+    </div>
   </div>
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
   <!-- MAIN CONTENT -->
-  <div class="container-fluid py-5" style="padding-top: 80px;">
+  <div class="container-fluid" style="padding-top: 80px; padding-bottom: 40px;">
     
     <!-- VIEW: ROLE SELECTION -->
     <div id="view-roles" class="view-section container">
-      <div class="text-center mb-5"><h1 class="display-4 fw-bold">Studio Delta</h1><p class="text-muted small text-uppercase">Production Management System</p></div>
-      <div class="row g-3" id="roleGrid"></div>
+      <div class="text-center mb-5 mt-3">
+        <h1 class="display-4 fw-bold mb-2">Studio Delta</h1>
+        <p class="text-muted small text-uppercase letter-spacing-2">Production Management System</p>
+      </div>
+      <div class="row g-4" id="roleGrid"></div>
     </div>
 
     <!-- VIEW: USER SELECTION -->
     <div id="view-users" class="view-section container d-none-view">
-      <button class="btn btn-outline-dark mb-4" onclick="navTo('view-roles')">&larr; BACK</button>
+      <button class="btn btn-outline-dark mb-4" onclick="navTo('view-roles')">
+        <i class="bi bi-arrow-left me-2"></i>BACK
+      </button>
       <h2 class="mb-4"><span id="selectedRoleTitle"></span> Team</h2>
       <div class="list-group list-group-flush bg-white rounded shadow-sm" id="userList"></div>
     </div>
 
     <!-- VIEW: WORKER DASHBOARD -->
     <div id="view-dashboard" class="view-section container d-none-view">
-      <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-        <div><h4 class="m-0" id="dashUser">User</h4><small class="text-muted text-uppercase" id="dashRole">Role</small></div>
+      <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+        <div>
+          <h4 class="m-0 mb-1" id="dashUser">User</h4>
+          <small class="text-muted text-uppercase" id="dashRole">Role</small>
+        </div>
       </div>
       
-      <input type="text" id="dashSearch" class="form-control mb-3" placeholder="Search Order #" onkeyup="filterDashboard()">
+      <input type="text" id="dashSearch" class="form-control mb-4" placeholder="Search Order #" onkeyup="filterDashboard()" aria-label="Search orders">
 
       <ul class="nav nav-pills nav-fill mb-4 bg-white p-2 rounded shadow-sm" id="dashTabs">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-available">Available</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-progress">In Progress</button></li>
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-available">Available</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-progress">In Progress</button>
+        </li>
       </ul>
-      <div class="text-end mb-2"><button class="btn btn-sm btn-link text-muted text-decoration-none" onclick="loadDashboard()"><i class="bi bi-arrow-clockwise"></i> Refresh</button></div>
+      <div class="text-end mb-3">
+        <button class="btn btn-sm btn-link text-muted text-decoration-none" onclick="loadDashboard()">
+          <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+      </div>
       <div class="tab-content">
-        <div class="tab-pane fade show active" id="pane-available"><div id="container-available"></div></div>
-        <div class="tab-pane fade" id="pane-progress"><div id="container-progress"></div></div>
+        <div class="tab-pane fade show active" id="pane-available">
+          <div id="container-available"></div>
+        </div>
+        <div class="tab-pane fade" id="pane-progress">
+          <div id="container-progress"></div>
+        </div>
       </div>
     </div>
 
@@ -186,40 +481,123 @@
     <div id="view-admin-prod" class="view-section container d-none-view">
       <h2 class="brand-font mb-4">Production Overview</h2>
       
-      <input type="text" id="prodSearch" class="form-control mb-3" placeholder="Search Order #" onkeyup="filterProduction()">
+      <input type="text" id="prodSearch" class="form-control mb-4" placeholder="Search Order #" onkeyup="filterProduction()" aria-label="Search orders">
 
-      <ul class="nav nav-pills mb-3" id="adminProdTabs">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-notstarted">Not Started</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-production">In Production</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-delivery">Out for Delivery</button></li>
+      <ul class="nav nav-pills mb-4 bg-white p-2 rounded shadow-sm" id="adminProdTabs">
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-notstarted">Not Started</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-production">In Production</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-delivery">Out for Delivery</button>
+        </li>
       </ul>
       <div class="tab-content">
-        <div class="tab-pane fade show active" id="tab-notstarted"><div id="list-notstarted"></div></div>
-        <div class="tab-pane fade" id="tab-production"><div id="list-production"></div></div>
-        <div class="tab-pane fade" id="tab-delivery"><div id="list-delivery"></div></div>
+        <div class="tab-pane fade show active" id="tab-notstarted">
+          <div id="list-notstarted"></div>
+        </div>
+        <div class="tab-pane fade" id="tab-production">
+          <div id="list-production"></div>
+        </div>
+        <div class="tab-pane fade" id="tab-delivery">
+          <div id="list-delivery"></div>
+        </div>
       </div>
     </div>
 
     <!-- VIEW: ADMIN WORKER STATS -->
     <div id="view-admin-workers" class="view-section container d-none-view">
       <h2 class="brand-font mb-4">Worker Information</h2>
-      <div class="row">
-        <div class="col-md-4 mb-3"><div class="list-group" id="workerSelect_List"></div></div>
-        <div class="col-md-8"><div id="workerDetailContent" class="bg-white p-4 rounded shadow-sm"><p class="text-muted text-center">Select a worker.</p></div></div>
+      <div class="row g-4">
+        <div class="col-md-4 mb-3">
+          <div class="list-group" id="workerSelect_List"></div>
+        </div>
+        <div class="col-md-8">
+          <div id="workerDetailContent" class="bg-white p-4 rounded shadow-sm">
+            <p class="text-muted text-center">Select a worker to view details.</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- MODALS -->
-  <div class="modal fade" id="passModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content text-center p-4"><h3 class="mb-3">Access Code</h3><p class="text-muted" id="passPromptName">Enter code</p><input type="password" id="inputPass" class="form-control text-center mb-3"><button class="btn btn-primary w-100" onclick="submitPass()">ENTER</button></div></div></div>
+  <div class="modal fade" id="passModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content text-center p-4 rounded-3 border-0 shadow">
+        <h3 class="mb-3 brand-font">Access Code</h3>
+        <p class="text-muted mb-3" id="passPromptName">Enter code</p>
+        <input type="password" id="inputPass" class="form-control text-center mb-4 py-2">
+        <button class="btn btn-primary w-100 py-3" onclick="submitPass()">ENTER</button>
+      </div>
+    </div>
+  </div>
   
-  <div class="modal fade" id="startModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content text-center p-4"><h3 class="brand-font mb-2">Start Order</h3><h1 class="fw-bold text-primary mb-3" id="startModalOrder">...</h1><button class="btn btn-primary btn-lg w-100 mt-3" onclick="confirmStart()">START TIMER</button></div></div></div>
+  <div class="modal fade" id="startModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content text-center p-4 rounded-3 border-0 shadow">
+        <h3 class="brand-font mb-3">Start Order</h3>
+        <h1 class="fw-bold mb-4" id="startModalOrder" style="font-size: 2.5rem;">...</h1>
+        <button class="btn btn-primary btn-lg w-100 py-3 mt-2" onclick="confirmStart()">START TIMER</button>
+      </div>
+    </div>
+  </div>
   
-  <div class="modal fade" id="qcModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title brand-font">Checklist</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><div class="mb-3"><strong>Order:</strong> <span id="qcOrderNum"></span></div><div id="qcChecklistContainer"></div><div class="mt-4"><label class="fw-bold">Signature</label><div class="border"><canvas id="sigCanvas"></canvas></div><button class="btn btn-sm btn-outline-secondary mt-2" onclick="clearSignature()">Clear</button></div></div><div class="modal-footer"><button class="btn btn-primary" onclick="submitQC()">CONFIRM</button></div></div></div></div>
+  <div class="modal fade" id="qcModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content rounded-3 border-0 shadow">
+        <div class="modal-header border-bottom">
+          <h5 class="modal-title brand-font">Quality Control Checklist</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="mb-4 pb-3 border-bottom">
+            <strong>Order:</strong> <span id="qcOrderNum" class="fw-bold"></span>
+          </div>
+          <div id="qcChecklistContainer"></div>
+          <div class="mt-4 pt-3 border-top">
+            <label class="fw-bold mb-2">Signature</label>
+            <div class="border rounded">
+              <canvas id="sigCanvas"></canvas>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary mt-3" onclick="clearSignature()">
+              <i class="bi bi-eraser"></i> Clear Signature
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer border-top">
+          <button class="btn btn-primary px-5 py-2" onclick="submitQC()">CONFIRM</button>
+        </div>
+      </div>
+    </div>
+  </div>
   
-  <div class="modal fade" id="alertModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-body text-center p-4"><h5 class="mb-3" id="alertMsg"></h5><button class="btn btn-primary px-4" data-bs-dismiss="modal">OK</button></div></div></div></div>
+  <div class="modal fade" id="alertModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-3 border-0 shadow">
+        <div class="modal-body text-center p-5">
+          <h5 class="mb-4" id="alertMsg"></h5>
+          <button class="btn btn-primary px-5 py-2" data-bs-dismiss="modal">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
   
-  <div class="modal fade" id="confirmModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-body text-center p-4"><h5 class="mb-3" id="confirmMsg"></h5><div class="d-flex justify-content-center gap-2"><button class="btn btn-primary px-4" id="confirmBtnYes">YES</button><button class="btn btn-outline-dark px-4" data-bs-dismiss="modal">NO</button></div></div></div></div></div>
+  <div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-3 border-0 shadow">
+        <div class="modal-body text-center p-5">
+          <h5 class="mb-4" id="confirmMsg"></h5>
+          <div class="d-flex justify-content-center gap-3">
+            <button class="btn btn-primary px-5 py-2" id="confirmBtnYes">YES</button>
+            <button class="btn btn-outline-dark px-5 py-2" data-bs-dismiss="modal">NO</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- JAVASCRIPT -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -304,7 +682,12 @@
       grid.innerHTML = '';
       const roles = [...new Set(appData.users.map(u => u.role))].sort();
       roles.forEach(r => {
-        grid.innerHTML += `<div class="col-md-4"><div class="card p-4 text-center h-100 role-card" onclick="selectRole('${r}')"><h4>${r}</h4></div></div>`;
+        grid.innerHTML += `
+          <div class="col-md-4 col-sm-6">
+            <div class="card p-4 text-center h-100 role-card" onclick="selectRole('${r}')">
+              <h4 class="mb-0">${r}</h4>
+            </div>
+          </div>`;
       });
     }
 
@@ -319,7 +702,10 @@
       document.getElementById('selectedRoleTitle').innerText = r; 
       list.innerHTML = '';
       appData.users.filter(u => u.role === r).forEach(u => {
-        list.innerHTML += `<button class="list-group-item list-group-item-action py-3 fw-bold" onclick="promptPass('${u.name}')">${u.name}</button>`;
+        list.innerHTML += `
+          <button class="list-group-item list-group-item-action py-3 fw-bold" onclick="promptPass('${u.name}')">
+            <i class="bi bi-person-circle me-2"></i>${u.name}
+          </button>`;
       });
       navTo('view-users');
     }
@@ -421,7 +807,17 @@
              }
           }
 
-          const html = `<div class="card mb-3 animate-card" id="${cardId}"><div class="status-bar ${isMine?'bar-running':(isLocked?'bar-locked':'bar-ready')}"></div><div class="card-body"><div class="d-flex justify-content-between mb-2"><h4>${o.order}</h4><span class="badge bg-dark">${o.status}</span></div>${btn}</div></div>`;
+          const html = `
+            <div class="card mb-3 animate-card" id="${cardId}">
+              <div class="status-bar ${isMine?'bar-running':(isLocked?'bar-locked':'bar-ready')}"></div>
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h4 class="mb-0">${o.order}</h4>
+                  <span class="badge bg-dark">${o.status}</span>
+                </div>
+                ${btn}
+              </div>
+            </div>`;
           
           if(isMine) pr.innerHTML += html; else av.innerHTML += html;
         });
@@ -482,7 +878,16 @@
 
       let h = ''; 
       qs.forEach((q,i) => {
-        h += `<div class="mb-3 border-bottom pb-2"><div class="fw-bold mb-1">${q}</div><div class="btn-group w-100" role="group"><input type="radio" class="btn-check" name="q${i}" id="q${i}y" value="Y" autocomplete="off"><label class="btn btn-outline-success" for="q${i}y">YES</label><input type="radio" class="btn-check" name="q${i}" id="q${i}n" value="N" autocomplete="off"><label class="btn btn-outline-danger" for="q${i}n">NO</label></div></div>`;
+        h += `
+          <div class="mb-4 pb-3 border-bottom">
+            <div class="fw-bold mb-3" style="color: #333; font-size: 15px;">${q}</div>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="q${i}" id="q${i}y" value="Y" autocomplete="off">
+              <label class="btn btn-outline-success py-2" for="q${i}y" style="flex: 1;">YES</label>
+              <input type="radio" class="btn-check" name="q${i}" id="q${i}n" value="N" autocomplete="off">
+              <label class="btn btn-outline-danger py-2" for="q${i}n" style="flex: 1;">NO</label>
+            </div>
+          </div>`;
       });
       document.getElementById('qcChecklistContainer').innerHTML = h;
       document.getElementById('qcOrderNum').innerText = ord; 
@@ -614,7 +1019,36 @@
           const totalTimeStr = formatDuration(totalDuration);
           const isRunning = tasks.some(t => !t.end);
           
-          let item = `<div class="card mb-2 shadow-sm"><div class="card-header bg-white"><button class="btn btn-link text-decoration-none text-dark w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#ord-${i}"><div><strong>${o.order}</strong> <span class="badge bg-light text-dark border ms-2">${o.status}</span></div><div>${isRunning ? '<span class="badge bg-success me-2">Active</span>' : ''}<span class="badge bg-dark">${totalTimeStr}</span></div></button></div><div id="ord-${i}" class="collapse"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Worker</th><th>Task</th><th>Start</th><th>End</th><th>Duration</th><th>QC</th></tr></thead><tbody>`;
+          let item = `
+            <div class="card mb-3 shadow-sm">
+              <div class="card-header bg-white border-0">
+                <button class="btn btn-link text-decoration-none text-dark w-100 text-start d-flex justify-content-between align-items-center p-0" 
+                        type="button" data-bs-toggle="collapse" data-bs-target="#ord-${i}">
+                  <div>
+                    <strong class="fs-5">${o.order}</strong> 
+                    <span class="badge bg-light text-dark border ms-2">${o.status}</span>
+                  </div>
+                  <div>
+                    ${isRunning ? '<span class="badge bg-success me-2">Active</span>' : ''}
+                    <span class="badge bg-dark">${totalTimeStr}</span>
+                  </div>
+                </button>
+              </div>
+              <div id="ord-${i}" class="collapse">
+                <div class="card-body p-0">
+                  <div class="table-responsive">
+                    <table class="table table-sm mb-0 table-hover">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Worker</th>
+                          <th>Task</th>
+                          <th>Start</th>
+                          <th>End</th>
+                          <th>Duration</th>
+                          <th>QC</th>
+                        </tr>
+                      </thead>
+                      <tbody>`;
           
           if(tasks.length === 0) {
             item += `<tr><td colspan="6" class="text-center text-muted py-3">No activity recorded yet.</td></tr>`;
