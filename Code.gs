@@ -277,7 +277,7 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
 
     // --- PDF GENERATION LOGIC ---
     var pdfUrl = "";
-    if ((role === 'Quality Control' || role === 'Assembly') && filesData && signatureUrl) {
+    if ((role === 'Quality Control' || role === 'Assembly') && qcData && signatureUrl) {
         var templateId = (role === 'Quality Control') ? TEMP_ID_PRE_POWDER : TEMP_ID_FINISHED;
         
         if(templateId && templateId.length > 5) {
@@ -490,7 +490,7 @@ function getNextStatus(current) {
     "ready for tagging", "tagging", 
     "ready for welding", "welding", 
     "ready for grinding", "grinding", 
-    "ready for pre-powder coating", 
+    "ready for pre-powder coating", "pre-powder coating",
     "powder coating", 
     "ready for assembly", "assembly", 
     "ready for delivery", "out for delivery", 
