@@ -235,6 +235,11 @@
             max-height: 50vh;
             overflow-y: auto;
         }
+        
+        /* Fix toggle bar overlap on Worker Information page (mobile) */
+        #view-admin-workers {
+            padding-left: 70px; /* Make room for toggle button */
+        }
     }
 
     @media (min-width: 769px) {
@@ -253,6 +258,11 @@
         .card:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        }
+        
+        /* Fix toggle bar overlap on Production Overview page (desktop) */
+        #view-admin-prod {
+            padding-left: 80px; /* Make room for toggle button */
         }
     }
     
