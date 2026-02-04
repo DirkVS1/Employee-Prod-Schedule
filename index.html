@@ -394,7 +394,20 @@
       const card = document.getElementById(`card-${session.pendingRow}`);
       if(card) { card.style.opacity='0.5'; setTimeout(()=>card.remove(), 500); }
       
-      google.script.run.withSuccessHandler(() => { isSubmitting=false; loadDashboard(true); }).finishOrder(session.pendingRow, session.logId, d, sig, fileData);
+      google.script.run
+        .withSuccessHandler((result) => { 
+          isSubmitting=false;
+          if(result && result.success === false) {
+            showAlert("Error completing order: " + (result.error || "Unknown error"));
+          }
+          loadDashboard(true);
+        })
+        .withFailureHandler((error) => {
+          isSubmitting=false;
+          showAlert("Error: " + error);
+          loadDashboard(true);
+        })
+        .finishOrder(session.pendingRow, session.logId, d, sig, fileData);
     }
 
     function toBase64(file) {
