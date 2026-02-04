@@ -275,32 +275,40 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
         sheet.getRange(rowIndex, 4).setValue(""); 
     }
 
-    // --- PDF GENERATION LOGIC ---
-    var pdfUrl = "";
-    if ((role === 'Quality Control' || role === 'Assembly') && qcData && signatureUrl) {
-        var templateId = (role === 'Quality Control') ? TEMP_ID_PRE_POWDER : TEMP_ID_FINISHED;
-        
-        if(templateId && templateId.length > 5) {
-            // Generate PDF
-            pdfUrl = generateQCPdf(templateId, orderNum, logs[rowToUpdate-1][2], qcData, signatureUrl, filesData);
-        }
-    }
-
-    // 3. CLOSE LOGS
+    // 3. CLOSE LOGS - Do this BEFORE PDF generation to ensure end time is always set
     if (rowToUpdate > 0) {
       logSheet.getRange(rowToUpdate, 7).setValue(endTime); 
       var resultStr = qcData ? qcData.map(function(i){return i.q+": "+i.a}).join("\n") : "Complete";
-      
-      // Append PDF Link if exists
-      if(pdfUrl) {
-        resultStr += "\n\nQC PDF: " + pdfUrl;
-      }
-      
       logSheet.getRange(rowToUpdate, 8).setValue(resultStr);
       if(signatureUrl) logSheet.getRange(rowToUpdate, 9).setValue(signatureUrl);
     }
 
-    // 4. UPDATE OVERVIEW
+    // 4. PDF GENERATION LOGIC - After end time is set, so errors here don't prevent time logging
+    var pdfUrl = "";
+    if (rowToUpdate > 0 && (role === 'Quality Control' || role === 'Assembly') && qcData && signatureUrl) {
+        var templateId = (role === 'Quality Control') ? TEMP_ID_PRE_POWDER : TEMP_ID_FINISHED;
+        
+        if(templateId && templateId.length > 5) {
+            try {
+              // Generate PDF
+              var workerName = logs[rowToUpdate-1][2];
+              pdfUrl = generateQCPdf(templateId, orderNum, workerName, qcData, signatureUrl, filesData);
+              
+              // Update log with PDF link
+              if(pdfUrl) {
+                var currentResult = logSheet.getRange(rowToUpdate, 8).getValue();
+                logSheet.getRange(rowToUpdate, 8).setValue(currentResult + "\n\nQC PDF: " + pdfUrl);
+              }
+            } catch(pdfError) {
+              // Log PDF generation error but don't fail the entire operation
+              Logger.log("PDF generation failed: " + pdfError.toString());
+              var currentResult = logSheet.getRange(rowToUpdate, 8).getValue();
+              logSheet.getRange(rowToUpdate, 8).setValue(currentResult + "\n\nPDF Error: " + pdfError.toString());
+            }
+        }
+    }
+
+    // 5. UPDATE OVERVIEW
     if (overviewSheet && rowToUpdate > 0) {
       var ovData = overviewSheet.getDataRange().getValues();
       var ovRow = -1;
