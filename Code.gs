@@ -276,9 +276,10 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
     }
 
     // 3. CLOSE LOGS - Do this BEFORE PDF generation to ensure end time is always set
+    var resultStr = "";
     if (rowToUpdate > 0) {
       logSheet.getRange(rowToUpdate, 7).setValue(endTime); 
-      var resultStr = qcData ? qcData.map(function(i){return i.q+": "+i.a}).join("\n") : "Complete";
+      resultStr = qcData ? qcData.map(function(i){return i.q+": "+i.a}).join("\n") : "Complete";
       logSheet.getRange(rowToUpdate, 8).setValue(resultStr);
       if(signatureUrl) logSheet.getRange(rowToUpdate, 9).setValue(signatureUrl);
     }
@@ -294,16 +295,16 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
               var workerName = logs[rowToUpdate-1][2];
               pdfUrl = generateQCPdf(templateId, orderNum, workerName, qcData, signatureUrl, filesData);
               
-              // Update log with PDF link
+              // Append PDF link to result
               if(pdfUrl) {
-                var currentResult = logSheet.getRange(rowToUpdate, 8).getValue();
-                logSheet.getRange(rowToUpdate, 8).setValue(currentResult + "\n\nQC PDF: " + pdfUrl);
+                resultStr += "\n\nQC PDF: " + pdfUrl;
+                logSheet.getRange(rowToUpdate, 8).setValue(resultStr);
               }
             } catch(pdfError) {
               // Log PDF generation error but don't fail the entire operation
               Logger.log("PDF generation failed: " + pdfError.toString());
-              var currentResult = logSheet.getRange(rowToUpdate, 8).getValue();
-              logSheet.getRange(rowToUpdate, 8).setValue(currentResult + "\n\nPDF Error: " + pdfError.toString());
+              resultStr += "\n\nPDF Error: " + pdfError.toString();
+              logSheet.getRange(rowToUpdate, 8).setValue(resultStr);
             }
         }
     }
@@ -382,7 +383,7 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
         element.removeFromParent();
       } else {
         // Replace with "No photo provided" text
-        element.asText().setText(tag.replace(/[{}]/g, '') + ": No photo provided");
+        element.asText().setText(tag.replace(/\{\{|\}\}/g, '') + ": No photo provided");
       }
     }
   }
