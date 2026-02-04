@@ -1,9 +1,9 @@
-// UPDATED SHEET ID
-var SHEET_ID = "11SGM3_REEC7O-zWoazApGp-7wzFoEg8GrRCk2Ot9UyQ"; 
-
+// --- CONFIGURATION ---
+var SHEET_ID = "11SGM3_REEC7O-zWoazApGp-7wzFoEg8GrRCk2Ot9UyQ"; // Your provided ID
 var TAB_ORDERS = "Orders";
 var TAB_USERS = "Users";
 var TAB_LOGS = "Production_Log";
+var TAB_OVERVIEW = "Overview";
 
 function doGet() {
   return HtmlService.createTemplateFromFile('index')
@@ -14,25 +14,24 @@ function doGet() {
 }
 
 function getSpreadsheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) { try { ss = SpreadsheetApp.openById("YOUR_ID_HERE"); } catch(e) { } }
-  return ss;
+  return SpreadsheetApp.openById(SHEET_ID);
 }
 
 function getSheetOrDie(ss, tabName) {
   var sheet = ss.getSheetByName(tabName);
-  if (!sheet) throw new Error("Missing Tab: '" + tabName + "'");
+  if (!sheet) throw new Error("Missing Tab: '" + tabName + "'. Please create it.");
   return sheet;
 }
 
-// --- CORE ---
+// --- CORE: USERS & LOGIN ---
 function getUsersAndRoles() {
   var ss = getSpreadsheet();
   var sheet = getSheetOrDie(ss, TAB_USERS); 
   var data = sheet.getDataRange().getValues();
   if (data.length <= 1) return []; 
-  data.shift(); 
-  return data.map(row => ({ name: row[0], role: row[1] }));
+  data.shift(); // Remove headers
+  // Col A=Name, Col B=Role
+  return data.map(function(row) { return { name: row[0], role: row[1] }; });
 }
 
 function verifyLogin(role, name, password) {
@@ -40,215 +39,345 @@ function verifyLogin(role, name, password) {
   var sheet = getSheetOrDie(ss, TAB_USERS);
   var data = sheet.getDataRange().getValues();
   
+  var adminPassword = null;
+  // Find Admin password first (fallback)
   for (var i = 1; i < data.length; i++) {
-    if (role === 'Admin' && data[i][1] === 'Admin' && data[i][2] == password) return { success: true };
-    if (role === data[i][1] && name === data[i][0] && data[i][2] == password) return { success: true };
+    if (String(data[i][1]).toLowerCase() === 'admin') {
+      adminPassword = data[i][2];
+      break;
+    }
+  }
+
+  for (var i = 1; i < data.length; i++) {
+    var rowName = data[i][0];
+    var rowRole = data[i][1];
+    var rowPass = data[i][2];
+
+    if (role === rowRole && name === rowName) {
+      // Check specific user password OR master admin password
+      if (String(password) == String(rowPass) || (adminPassword && String(password) == String(adminPassword))) {
+        return { success: true, isAdmin: (role === 'Admin') };
+      }
+    }
   }
   return { success: false, error: "Incorrect Access Code" };
 }
 
-// --- WORKER APP ---
+// --- WORKER DASHBOARD: GET ORDERS ---
 function getOrdersForRole(role) {
   var ss = getSpreadsheet();
   var sheet = getSheetOrDie(ss, TAB_ORDERS);
   var data = sheet.getDataRange().getValues();
   var relevantOrders = [];
   
+  // Mapping Roles to Visible Statuses
   var visibilityMap = {
     'Cutting': ['not yet started', 'ready for steelwork', 'cutting steel'],
     'Tagging': ['ready for tagging', 'tagging'],
     'Welding': ['ready for welding', 'welding'],
     'Grinding': ['ready for grinding', 'grinding'],
-    'Quality Control': ['ready for pre-powder coating', 'pre-powder coating', 'ready for powder coating', 'powder coating', 'ready for delivery', 'out for delivery'],
+    // Quality Control handles the paint/powder/delivery flow in this system
+    'Quality Control': [
+      'ready for pre-powder coating', 'pre-powder coating', 
+      'ready for powder coating', 'powder coating', 
+      'ready for delivery', 'out for delivery'
+    ],
     'Assembly': ['ready for assembly', 'assembly']
   };
 
   var allowedStatuses = visibilityMap[role] || [];
   
+  // Start loop at 1 to skip headers
   for (var i = 1; i < data.length; i++) {
-    var statusLower = String(data[i][2]).toLowerCase().trim();
-    if (role === 'Admin' || allowedStatuses.includes(statusLower)) {
+    var orderNum = data[i][1]; // Col B
+    var status = String(data[i][2]).toLowerCase().trim(); // Col C
+    var assigned = data[i][3]; // Col D
+
+    if (role === 'Admin' || allowedStatuses.includes(status)) {
       relevantOrders.push({
-        rowIndex: i + 1,
-        order: data[i][1],
-        status: data[i][2],
-        assigned: data[i][3]
+        rowIndex: i + 1, // Store 1-based index for updates
+        order: orderNum,
+        status: data[i][2], // Keep original case for display
+        assigned: assigned
       });
     }
   }
   return relevantOrders;
 }
 
-function startOrder(rowIndex, workerName, role) {
-  var ss = getSpreadsheet();
-  var sheet = getSheetOrDie(ss, TAB_ORDERS);
-  var logSheet = getSheetOrDie(ss, TAB_LOGS);
+// --- ACTION: START ORDER ---
+function startOrder(rowIndex, orderCheck, workerName, role) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   
-  var currentAssigned = sheet.getRange(rowIndex, 4).getValue();
-  if (currentAssigned !== "" && currentAssigned !== workerName) throw new Error("Order locked by " + currentAssigned);
-  
-  var currentStatus = sheet.getRange(rowIndex, 3).getValue();
-  var nextStatus = getNextStatus(currentStatus);
-  
-  if (nextStatus.toLowerCase().startsWith("ready") || currentStatus.toLowerCase().startsWith("ready")) {
-      while (nextStatus.toLowerCase().startsWith("ready")) { nextStatus = getNextStatus(nextStatus); if (!nextStatus) break; }
-  }
+  try {
+    var ss = getSpreadsheet();
+    var sheet = getSheetOrDie(ss, TAB_ORDERS);
+    var logSheet = getSheetOrDie(ss, TAB_LOGS);
+    var overviewSheet = ss.getSheetByName(TAB_OVERVIEW); // Optional
+    
+    // SAFETY CHECK: Ensure the row hasn't moved
+    var currentRowOrder = sheet.getRange(rowIndex, 2).getValue();
+    if (String(currentRowOrder) !== String(orderCheck)) {
+      throw new Error("Row mismatch. The sheet may have been sorted. Please refresh.");
+    }
 
-  sheet.getRange(rowIndex, 3).setValue(nextStatus);
-  sheet.getRange(rowIndex, 4).setValue(workerName);
-  
-  var uniqueId = Utilities.getUuid();
-  logSheet.appendRow([uniqueId, sheet.getRange(rowIndex, 2).getValue(), workerName, role, nextStatus, new Date(), ""]);
-  SpreadsheetApp.flush();
-  return { success: true, newStatus: nextStatus, logId: uniqueId };
+    var currentAssigned = sheet.getRange(rowIndex, 4).getValue();
+    if (currentAssigned === workerName) return { success: true, message: "Already started by you." };
+    if (currentAssigned !== "") throw new Error("Order is currently locked by " + currentAssigned);
+    
+    var currentStatus = sheet.getRange(rowIndex, 3).getValue();
+    var nextStatus = getNextStatus(currentStatus);
+    
+    // Auto-advance if the next status is just a "Ready" state
+    // e.g. If current is "Ready for Welding", change to "Welding" immediately
+    if (nextStatus.toLowerCase().startsWith("ready") || currentStatus.toLowerCase().startsWith("ready")) {
+        var safety = 0;
+        while (nextStatus.toLowerCase().startsWith("ready") && safety < 5) { 
+          var temp = getNextStatus(nextStatus); 
+          if (!temp) break; 
+          nextStatus = temp;
+          safety++;
+        }
+    }
+
+    // Update Orders Tab
+    sheet.getRange(rowIndex, 3).setValue(nextStatus);
+    sheet.getRange(rowIndex, 4).setValue(workerName);
+    
+    var uniqueId = Utilities.getUuid();
+    var startTime = new Date();
+
+    // 1. Update Production_Log
+    // [ID, Order, Worker, Role, Task, Start, End, QC, Sig]
+    logSheet.appendRow([uniqueId, currentRowOrder, workerName, role, nextStatus, startTime, "", "", ""]);
+    
+    // 2. Update Overview Tab
+    if (overviewSheet) {
+      // [ID, Order, Worker, Process, Start, End, Duration]
+      overviewSheet.appendRow([uniqueId, currentRowOrder, workerName, nextStatus, startTime, "", ""]);
+    }
+    
+    SpreadsheetApp.flush();
+    return { success: true, newStatus: nextStatus, logId: uniqueId };
+    
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-function finishOrder(rowIndex, logId, qcData, signatureUrl) {
-  var ss = getSpreadsheet();
-  var sheet = getSheetOrDie(ss, TAB_ORDERS);
-  var logSheet = getSheetOrDie(ss, TAB_LOGS);
+// --- ACTION: FINISH ORDER ---
+function finishOrder(rowIndex, orderCheck, logId, qcData, signatureUrl) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   
-  var nextStep = getNextStatus(sheet.getRange(rowIndex, 3).getValue()); 
-  sheet.getRange(rowIndex, 3).setValue(nextStep);
-  sheet.getRange(rowIndex, 4).setValue(""); 
-  
-  var logs = logSheet.getDataRange().getValues();
-  for (var i = 0; i < logs.length; i++) {
-    if (logs[i][0] == logId) {
-      logSheet.getRange(i+1, 7).setValue(new Date()); 
+  try {
+    var ss = getSpreadsheet();
+    var sheet = getSheetOrDie(ss, TAB_ORDERS);
+    var logSheet = getSheetOrDie(ss, TAB_LOGS);
+    var overviewSheet = ss.getSheetByName(TAB_OVERVIEW);
+    
+    // SAFETY CHECK
+    var currentRowOrder = sheet.getRange(rowIndex, 2).getValue();
+    if (String(currentRowOrder) !== String(orderCheck)) {
+      throw new Error("Row mismatch. Please refresh.");
+    }
+
+    var currentStatus = sheet.getRange(rowIndex, 3).getValue();
+    var nextStep = getNextStatus(currentStatus); 
+    
+    // Release the Order
+    sheet.getRange(rowIndex, 3).setValue(nextStep);
+    sheet.getRange(rowIndex, 4).setValue(""); // Clear assigned worker
+    
+    var endTime = new Date();
+
+    // --- UPDATE PRODUCTION LOG ---
+    var logs = logSheet.getDataRange().getValues();
+    var rowToUpdate = -1;
+    var startTime = null;
+    var processName = "";
+
+    // Find the log entry
+    if (logId) {
+      for (var i = 0; i < logs.length; i++) {
+        if (logs[i][0] == logId) { 
+          rowToUpdate = i + 1; 
+          startTime = logs[i][5] ? new Date(logs[i][5]) : null;
+          processName = logs[i][4];
+          break; 
+        }
+      }
+    }
+
+    // Fallback search if ID logic failed (e.g. manual sheet edit)
+    if (rowToUpdate === -1) {
+      for (var i = logs.length - 1; i >= 0; i--) {
+        // Match Order + Status + Empty End Time
+        if (String(logs[i][1]) == String(currentRowOrder) && String(logs[i][4]) == String(currentStatus) && logs[i][6] === "") {
+          rowToUpdate = i + 1;
+          startTime = logs[i][5] ? new Date(logs[i][5]) : null;
+          processName = logs[i][4];
+          break;
+        }
+      }
+    }
+
+    if (rowToUpdate > 0) {
+      logSheet.getRange(rowToUpdate, 7).setValue(endTime); // End Time
+      
       var qcString = qcData ? qcData.map(function(item){ return item.q + ": " + item.a; }).join("\n") : "Skipped";
-      logSheet.getRange(i+1, 8).setValue(qcString);
-      if(signatureUrl) logSheet.getRange(i+1, 9).setValue(signatureUrl);
-      break;
+      logSheet.getRange(rowToUpdate, 8).setValue(qcString); // QC Data
+      
+      if(signatureUrl) {
+        logSheet.getRange(rowToUpdate, 9).setValue(signatureUrl); // Signature
+      }
     }
+
+    // --- UPDATE OVERVIEW TAB ---
+    if (overviewSheet && rowToUpdate > 0) { 
+      var ovData = overviewSheet.getDataRange().getValues();
+      var ovRow = -1;
+      
+      if (logId) {
+        for (var k = 0; k < ovData.length; k++) {
+          if (ovData[k][0] == logId) { ovRow = k + 1; break; }
+        }
+      } 
+      
+      if (ovRow === -1) {
+         for (var k = ovData.length - 1; k >= 0; k--) {
+            if (String(ovData[k][1]) == String(currentRowOrder) && String(ovData[k][3]) == String(currentStatus) && ovData[k][5] === "") {
+               ovRow = k + 1;
+               break;
+            }
+         }
+      }
+
+      if (ovRow > 0) {
+        var durationMins = calculateWorkMinutesServer(startTime, endTime, processName);
+        var durationStr = formatDurationServer(durationMins);
+        overviewSheet.getRange(ovRow, 6).setValue(endTime); 
+        overviewSheet.getRange(ovRow, 7).setValue(durationStr);
+      }
+    }
+    
+    SpreadsheetApp.flush();
+    return { success: true };
+    
+  } finally {
+    lock.releaseLock();
   }
-  SpreadsheetApp.flush();
-  return { success: true };
 }
 
-// --- ADMIN FEATURES ---
-
-function getProductionOverview() {
-  var ss = getSpreadsheet();
-  var logSheet = getSheetOrDie(ss, TAB_LOGS);
-  var data = logSheet.getDataRange().getValues();
-  data.shift(); // Remove header
-
-  // Return raw log data enriched with duration
-  return data.map(row => {
-    var start = row[5] ? new Date(row[5]) : null;
-    var end = row[6] ? new Date(row[6]) : null;
-    var duration = calculateWorkMinutes(start, end);
-
-    return {
-      order: row[1],
-      worker: row[2],
-      role: row[3],
-      task: row[4],
-      start: start,
-      end: end,
-      durationMins: duration,
-      qc: row[7] // QC Data
-    };
-  });
-}
-
-function getWorkerStats() {
-  var ss = getSpreadsheet();
-  var logSheet = getSheetOrDie(ss, TAB_LOGS);
-  var data = logSheet.getDataRange().getValues();
-  data.shift();
-
-  var workers = {};
+// --- SERVER SIDE TIME CALCULATION ---
+function calculateWorkMinutesServer(start, end, taskName) {
+  if (!start || !end) return 0;
   
-  data.forEach(row => {
-    var name = row[2];
-    if (!name) return;
-    if (!workers[name]) workers[name] = { totalMins: 0, weeklyMins: {}, logs: [] };
-    
-    var start = row[5] ? new Date(row[5]) : null;
-    var end = row[6] ? new Date(row[6]) : null;
-    var duration = calculateWorkMinutes(start, end);
-    
-    workers[name].totalMins += duration;
-    
-    // Calculate week key (ISO week)
-    if (start) {
-      var weekKey = getWeekKey(start);
-      if (!workers[name].weeklyMins[weekKey]) workers[name].weeklyMins[weekKey] = 0;
-      workers[name].weeklyMins[weekKey] += duration;
-    }
-    
-    workers[name].logs.push({
-      task: row[4],
-      order: row[1],
-      start: start,
-      end: end,
-      duration: duration,
-      role: row[3]
-    });
-  });
-  
-  return workers;
-}
+  // Powder Coating runs 24/7 (Oven time)
+  if (taskName && taskName.toLowerCase().includes('powder')) {
+    return (end.getTime() - start.getTime()) / 1000 / 60;
+  }
 
-// Helper to get ISO week key (YYYY-Wxx)
-// ISO week calculation: Week 1 is the first week with a Thursday in it
-// Algorithm adjusts date to Thursday of the same week, then calculates week number
-function getWeekKey(date) {
-  var d = new Date(date.getTime());
-  d.setHours(0, 0, 0, 0);
-  // Set to Thursday of the current week (ISO week starts on Monday)
-  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-  // Get first Thursday of the year (week 1)
-  var week1 = new Date(d.getFullYear(), 0, 4);
-  // Calculate week number: days between divided by 7, adjusted for day of week
-  var weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-  return d.getFullYear() + '-W' + (weekNum < 10 ? '0' : '') + weekNum;
-}
-
-// --- UTILS ---
-
-function getNextStatus(current) {
-  var flow = ["not yet started", "ready for steelwork", "cutting steel", "ready for tagging", "tagging", "ready for welding", "welding", "ready for grinding", "grinding", "ready for pre-powder coating", "pre-powder coating", "ready for powder coating", "powder coating", "ready for assembly", "assembly", "ready for delivery", "out for delivery", "delivered"];
-  var idx = flow.indexOf(String(current).toLowerCase().trim());
-  return (idx > -1 && idx < flow.length - 1) ? flow[idx + 1] : current; 
-}
-
-// THE TIME CALCULATOR (07:30 - 15:45)
-function calculateWorkMinutes(start, end) {
-  if (!start) return 0;
-  if (!end) end = new Date(); // If running, calc up to now
-  
+  // Standard Shifts: 07:30 to 15:45
   var totalMinutes = 0;
   var current = new Date(start.getTime());
-  
-  // Safety break to prevent infinite loops (max 30 days)
   var safety = 0;
-  
-  while (current < end && safety < 30) {
-    // Define shift start/end for THIS day
+
+  while (current < end && safety < 1000) {
+    safety++;
+    var day = current.getDay();
+    // Skip Weekend (0=Sun, 6=Sat)
+    if (day === 0 || day === 6) {
+      current.setDate(current.getDate() + 1);
+      current.setHours(7, 30, 0, 0);
+      continue;
+    }
+
     var shiftStart = new Date(current);
     shiftStart.setHours(7, 30, 0, 0);
-    
     var shiftEnd = new Date(current);
     shiftEnd.setHours(15, 45, 0, 0);
-    
-    // Determine the overlapping window
+
+    // Determine overlap
     var windowStart = (current > shiftStart) ? current : shiftStart;
-    var windowEnd = (end < shiftEnd) ? end : shiftEnd; // Cap at shift end or actual end
-    
-    // If we have a valid window for this day
+    var windowEnd = (end < shiftEnd) ? end : shiftEnd;
+
     if (windowStart < windowEnd) {
-      var diffMs = windowEnd - windowStart;
-      totalMinutes += (diffMs / 1000 / 60);
+      totalMinutes += (windowEnd.getTime() - windowStart.getTime()) / 1000 / 60;
     }
-    
-    // Move to next day 07:30
-    current.setDate(current.getDate() + 1);
-    current.setHours(7, 30, 0, 0);
-    safety++;
+
+    if (end < shiftEnd) {
+      break;
+    } else {
+      current.setDate(current.getDate() + 1);
+      current.setHours(7, 30, 0, 0);
+    }
   }
+  return totalMinutes;
+}
+
+function formatDurationServer(totalMins) {
+  var h = Math.floor(totalMins / 60);
+  var m = Math.floor(totalMins % 60);
+  return (h < 10 ? "0"+h : h) + ":" + (m < 10 ? "0"+m : m);
+}
+
+// --- ADMIN DASHBOARD DATA ---
+function getAdminDashboardData() {
+  var ss = getSpreadsheet();
   
-  return Math.floor(totalMinutes);
+  var logSheet = getSheetOrDie(ss, TAB_LOGS);
+  var logData = logSheet.getDataRange().getValues();
+  // Headers in Log: ID, Order, Worker, Role, Task, Start, End, QC, Sig
+  
+  var logs = [];
+  if (logData.length > 1) {
+    logData.shift(); 
+    logs = logData.map(function(row) {
+      return {
+        order: row[1],
+        worker: row[2],
+        role: row[3],
+        task: row[4],
+        start: row[5] ? new Date(row[5]).getTime() : null,
+        end: row[6] ? new Date(row[6]).getTime() : null,
+        qc: row[7]
+      };
+    });
+  }
+
+  var orderSheet = getSheetOrDie(ss, TAB_ORDERS);
+  var orderData = orderSheet.getDataRange().getValues();
+  var orders = [];
+  if (orderData.length > 1) {
+    orderData.shift(); 
+    orders = orderData.map(function(row) {
+      return { order: row[1], status: row[2] };
+    });
+  }
+
+  return { logs: logs, orders: orders };
+}
+
+// --- STATUS FLOW LOGIC ---
+function getNextStatus(current) {
+  var c = String(current).toLowerCase().trim();
+  
+  var flow = [
+    "not yet started", 
+    "ready for steelwork", "cutting steel", 
+    "ready for tagging", "tagging", 
+    "ready for welding", "welding", 
+    "ready for grinding", "grinding", 
+    "ready for pre-powder coating", "pre-powder coating", // Corrected flow
+    "ready for powder coating", "powder coating", 
+    "ready for assembly", "assembly", 
+    "ready for delivery", "out for delivery", 
+    "delivered"
+  ];
+  
+  var idx = flow.indexOf(c);
+  // If found and not last item, return next
+  return (idx > -1 && idx < flow.length - 1) ? flow[idx + 1] : c; 
 }
