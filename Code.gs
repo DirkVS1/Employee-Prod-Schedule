@@ -368,17 +368,22 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
     }
   }
 
-  // Helper to insert image at placeholder
+  // Helper to insert image at placeholder or replace with default text
   function replaceImageTag(tag, base64Data) {
     var r = body.findText(tag);
     if (r) {
       var element = r.getElement();
       var parent = element.getParent();
-      // Insert image
-      var imgBlob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/png');
-      parent.insertInlineImage(parent.getChildIndex(element)+1, imgBlob).setWidth(200).setHeight(200);
-      // Remove text tag
-      element.removeFromParent();
+      if (base64Data) {
+        // Insert image
+        var imgBlob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/png');
+        parent.insertInlineImage(parent.getChildIndex(element)+1, imgBlob).setWidth(200).setHeight(200);
+        // Remove text tag
+        element.removeFromParent();
+      } else {
+        // Replace with "No photo provided" text
+        element.asText().setText(tag.replace(/[{}]/g, '') + ": No photo provided");
+      }
     }
   }
 
@@ -393,12 +398,10 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   // Detect which map to use based on finding a tag in the doc
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
-  if (photos && photos.length > 0) {
-    for (var j = 0; j < photos.length; j++) {
-      if (j < useMap.length) {
-        replaceImageTag(useMap[j], photos[j].data);
-      }
-    }
+  // Process each photo slot
+  for (var j = 0; j < useMap.length; j++) {
+    var photoData = (photos && j < photos.length) ? photos[j].data : null;
+    replaceImageTag(useMap[j], photoData);
   }
 
   doc.saveAndClose();
