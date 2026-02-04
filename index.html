@@ -674,7 +674,7 @@
       
       document.getElementById('sidebar').classList.remove('active');
       document.getElementById('sidebarOverlay').classList.remove('active');
-      document.querySelector('.menu-toggle').classList.remove('active');
+      document.querySelector('.menu-toggle')?.classList.remove('active');
       
       if(viewId !== 'view-dashboard') stopAutoRefresh();
     }
