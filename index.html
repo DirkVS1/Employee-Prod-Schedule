@@ -485,7 +485,7 @@
       if(reqPhotos) {
         phContainer.classList.remove('d-none');
         reqPhotos.forEach((label, idx) => {
-           phInputs.innerHTML += `<div class="mb-2"><label>${label}</label><input type="file" class="form-control photo-input" accept="image/*" capture="environment" data-idx="${idx}"></div>`;
+           phInputs.innerHTML += `<div class="mb-2"><label for="photo-input-${idx}">${label}</label><input type="file" id="photo-input-${idx}" class="form-control photo-input" accept="image/*" capture="environment" data-idx="${idx}"></div>`;
         });
       } else {
         phContainer.classList.add('d-none');
@@ -527,14 +527,14 @@
             const inputs = document.querySelectorAll('.photo-input');
             // Check if all required photos are uploaded
             if(inputs.length > 0) {
-                let allPhotosUploaded = true;
+                let areAllPhotosUploaded = true;
                 for(let input of inputs) {
                     if(input.files.length === 0) {
-                        allPhotosUploaded = false;
+                        areAllPhotosUploaded = false;
                         break;
                     }
                 }
-                if(!allPhotosUploaded) { 
+                if(!areAllPhotosUploaded) { 
                     showAlert("Please upload all required photos before confirming."); 
                     return; 
                 }
