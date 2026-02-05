@@ -103,6 +103,7 @@ function getOrdersForRole(role) {
     'Quality Control': [
       'ready for pre-powder coating', 'pre-powder coating', 
       'ready for powder coating', 'powder coating', 
+      'ready for final qc', 'final qc',
       'ready for delivery', 'out for delivery'
     ],
     'Assembly': ['ready for assembly', 'assembly']
@@ -218,29 +219,58 @@ function startOrder(rowIndex, workerName, role) {
 
 function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
   var lock = LockService.getScriptLock();
-  // Increase wait time because PDF generation can take a few seconds
-  lock.waitLock(30000); 
+  lock.waitLock(120000); 
   
   try {
     var ss = getSpreadsheet();
     var sheet = getSheetOrDie(ss, TAB_ORDERS);
     var logSheet = getSheetOrDie(ss, TAB_LOGS);
     var overviewSheet = ss.getSheetByName(TAB_OVERVIEW);
-    var endTime = new Date();
+    var endTime = new Date(); // Capture time immediately
     
+    // --- STEP 1: UPDATE STATUS IMMEDIATELY & SAVE ---
+    // We update the status first so if the dashboard refreshes, it sees the order is done.
+    
+    // Determine Flow Logic (Replicated from original to get correct status)
+    var currentStatus = sheet.getRange(rowIndex, 3).getValue();
     var role = ""; 
+    
+    // We need to fetch the log briefly to check the role if not 'Plate Cutting'
+    // But for speed, we can infer role from the Log Sheet later, 
+    // here we just need to know if we should clear the row in Orders tab.
+    
+    // Check if it's Plate Cutting (Special case)
+    var isPlateCutting = false;
+    // We can check the columns. If Col 5 (E) has 'plate cutting', it's that.
+    if(sheet.getRange(rowIndex, 5).getValue() == 'plate cutting') {
+        isPlateCutting = true;
+        sheet.getRange(rowIndex, 5).setValue("finished"); 
+        sheet.getRange(rowIndex, 6).setValue("");
+    } else {
+        // Main Flow
+        var nextStep = getNextStatus(currentStatus); 
+        sheet.getRange(rowIndex, 3).setValue(nextStep);
+        sheet.getRange(rowIndex, 4).setValue(""); 
+    }
+
+    // *** THE MAGIC FIX ***
+    // This forces the sheet to save changes NOW, before the slow PDF generation starts.
+    SpreadsheetApp.flush(); 
+    // *********************
+
+    // --- STEP 2: LOGGING & PDF (The Slow Part) ---
     var logs = logSheet.getDataRange().getValues();
     var rowToUpdate = -1;
     var processName = "";
     var startTime = null;
     var orderNum = "";
 
-    // 1. FIND LOG ENTRY
+    // Find Log Entry
     if (logId) {
       for (var i = 0; i < logs.length; i++) {
         if (logs[i][0] == logId) { 
           rowToUpdate = i + 1; 
-          role = logs[i][3]; // Col D is Role
+          role = logs[i][3]; 
           processName = logs[i][4];
           startTime = logs[i][5] ? new Date(logs[i][5]) : null;
           orderNum = logs[i][1];
@@ -249,7 +279,7 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
       }
     }
 
-    // Fallback if ID missing
+    // Fallback search if ID missing
     if (rowToUpdate === -1) {
        orderNum = sheet.getRange(rowIndex, 2).getValue();
        for (var i = logs.length - 1; i >= 0; i--) {
@@ -263,20 +293,6 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
        }
     }
 
-    // 2. UPDATE SHEET STATUS
-    if (role === 'Plate Cutting') {
-        // Independent Flow: Mark finished in Col E, Clear Col F
-        sheet.getRange(rowIndex, 5).setValue("finished"); 
-        sheet.getRange(rowIndex, 6).setValue("");
-    } else {
-        // Main Flow
-        var currentStatus = sheet.getRange(rowIndex, 3).getValue();
-        var nextStep = getNextStatus(currentStatus); 
-        sheet.getRange(rowIndex, 3).setValue(nextStep);
-        sheet.getRange(rowIndex, 4).setValue(""); 
-    }
-
-    // 3. CLOSE LOGS - Do this BEFORE PDF generation to ensure end time is always set
     var resultStr = "";
     if (rowToUpdate > 0) {
       logSheet.getRange(rowToUpdate, 7).setValue(endTime); 
@@ -285,24 +301,25 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
       if(signatureUrl) logSheet.getRange(rowToUpdate, 9).setValue(signatureUrl);
     }
 
-    // 4. PDF GENERATION LOGIC - After end time is set, so errors here don't prevent time logging
+    // PDF GENERATION
     var pdfUrl = "";
-    if (rowToUpdate > 0 && (role === 'Quality Control' || role === 'Assembly') && qcData && signatureUrl) {
-        var templateId = (role === 'Quality Control') ? TEMP_ID_PRE_POWDER : TEMP_ID_FINISHED;
+    if (rowToUpdate > 0 && (role === 'Quality Control' || role === 'Assembly') && qcData && signatureUrl && processName !== 'powder coating') {
+        var templateId = TEMP_ID_PRE_POWDER;
+        if (processName === 'final qc') {
+            templateId = TEMP_ID_FINISHED;
+        }
         
         if(templateId && templateId.length > 5) {
             try {
-              // Generate PDF
               var workerName = logs[rowToUpdate-1][2];
+              // Call the PDF generator
               pdfUrl = generateQCPdf(templateId, orderNum, workerName, qcData, signatureUrl, filesData);
               
-              // Append PDF link to result
               if(pdfUrl) {
                 resultStr += "\n\nQC PDF: " + pdfUrl;
                 logSheet.getRange(rowToUpdate, 8).setValue(resultStr);
               }
             } catch(pdfError) {
-              // Log PDF generation error but don't fail the entire operation
               Logger.log("PDF generation failed: " + pdfError.toString());
               resultStr += "\n\nPDF Error: " + pdfError.toString();
               logSheet.getRange(rowToUpdate, 8).setValue(resultStr);
@@ -310,19 +327,17 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
         }
     }
 
-    // 5. UPDATE OVERVIEW
+    // UPDATE OVERVIEW
     if (overviewSheet && rowToUpdate > 0) {
       var ovData = overviewSheet.getDataRange().getValues();
       var ovRow = -1;
       
-      // Try ID match first
       if (logId) {
         for (var k = 0; k < ovData.length; k++) {
           if (ovData[k][0] == logId) { ovRow = k + 1; break; }
         }
       }
       
-      // Fallback
       if (ovRow === -1) {
          for (var k = ovData.length - 1; k >= 0; k--) {
             if (ovData[k][1] == orderNum && ovData[k][3] == processName && ovData[k][5] === "") {
@@ -340,7 +355,6 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
       }
     }
     
-    SpreadsheetApp.flush();
     return { success: true };
     
   } catch(e) {
@@ -353,15 +367,6 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
 function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, photos) {
   var folder = getFolder();
   var templateFile = DriveApp.getFileById(templateId);
-  
-  // Force a refresh by opening the document first
-  try {
-    var tempDoc = DocumentApp.openById(templateId);
-    tempDoc.saveAndClose();
-  } catch(e) {
-    Logger.log("Could not open template for refresh: " + e.toString());
-  }
-  
   var newFile = templateFile.makeCopy(orderNum + "_QC_" + new Date().toISOString().slice(0,10), folder);
   var doc = DocumentApp.openById(newFile.getId());
   var body = doc.getBody();
@@ -371,95 +376,84 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   body.replaceText("{{Timestamp}}", new Date().toLocaleString());
   body.replaceText("{{OrderNumber}}", orderNum);
 
-  // 2. Answer Replacements (FIX: Convert Y/N to Yes/No)
+  // 2. Answer Replacements (Y/N -> Yes/No)
   if (qcAnswers) {
     for (var i = 0; i < qcAnswers.length; i++) {
-      var ans = qcAnswers[i].a;
-      if (ans === "Y") ans = "Yes";
-      else if (ans === "N") ans = "No";
-      
-      body.replaceText("{{Q" + (i+1) + "}}", ans);
+      var answerRaw = qcAnswers[i].a;
+      var answerFormatted = answerRaw;
+      if (answerRaw === "Y") answerFormatted = "Yes";
+      if (answerRaw === "N") answerFormatted = "No";
+      body.replaceText("{{Q" + (i+1) + "}}", answerFormatted);
     }
   }
 
-  // Helper to find all occurrences of a tag and store their info
-  function findAllTagOccurrences(tag) {
-    var occurrences = [];
-    var searchResult = body.findText(tag);
-    while (searchResult !== null) {
-      var element = searchResult.getElement();
+  // --- HELPER FUNCTION FOR IMAGES WITH HEADERS ---
+  function replaceImageTagWithHeader(tag, base64Data) {
+    var r = body.findText(tag);
+    if (r) {
+      var element = r.getElement();
       var parent = element.getParent();
-      var childIndex = parent.getChildIndex(element);
-      occurrences.push({
-        element: element,
-        parent: parent,
-        childIndex: childIndex
-      });
-      searchResult = body.findText(tag, searchResult);
+      
+      // Generate a clean header name from the tag
+      // e.g., "{{Image_SpiritLevel}}" becomes "Spirit Level"
+      var headerText = tag.replace("{{Image_", "").replace("}}", "").replace("{{", "").replace("}}", "");
+      // Insert space before capital letters to separate words
+      headerText = headerText.replace(/([A-Z])/g, ' $1').trim();
+
+      if (base64Data) {
+        // 1. Update the text to be the Header
+        var text = element.asText();
+        text.setText(headerText + "\r"); // \r adds a new line
+        text.setBold(true);
+        text.setFontSize(11); // Optional: ensure header size
+
+        // 2. Insert Image BELOW the header
+        var imgBlob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/png');
+        var img = parent.insertInlineImage(parent.getChildIndex(element)+1, imgBlob);
+        
+        // 3. Set Size (Large)
+        img.setWidth(350).setHeight(350);
+      } else {
+        // No photo provided case
+        element.asText().setText(headerText + ": No photo provided");
+        element.asText().setBold(false);
+      }
     }
-    return occurrences;
   }
 
-  // 3. Signature
-  if (sigBase64) {
-    var sigOccurrences = findAllTagOccurrences("{{Signature}}");
-    var sigData = sigBase64.split(',')[1];
-    for (var s = 0; s < sigOccurrences.length; s++) {
-      var occ = sigOccurrences[s];
-      var imgBlob = Utilities.newBlob(Utilities.base64Decode(sigData), 'image/png');
-      // Signature stays small
-      occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob).setWidth(200).setHeight(100);
-      occ.element.removeFromParent();
-    }
+  // 3. Signature (Special handling for size)
+  var sigTag = "{{Signature}}";
+  var sigRange = body.findText(sigTag);
+  if (sigRange) {
+      var sigElem = sigRange.getElement();
+      var sigParent = sigElem.getParent();
+      
+      // Set Header
+      sigElem.asText().setText("Signature\r");
+      sigElem.asText().setBold(true);
+
+      if (sigBase64) {
+        // Note: Signature from canvas usually has "data:image/png;base64," prefix, we must strip it
+        var cleanSig = sigBase64.split(',')[1];
+        var sigBlob = Utilities.newBlob(Utilities.base64Decode(cleanSig), 'image/png');
+        
+        var sigImg = sigParent.insertInlineImage(sigParent.getChildIndex(sigElem)+1, sigBlob);
+        sigImg.setWidth(200).setHeight(100); // Keep signature smaller/rectangular
+      } else {
+        sigElem.asText().setText("Signature: Not signed");
+      }
   }
 
-  // 4. Photos
-  // Updated list including new tags
+  // 4. Process Photos using the new Helper
   var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
   var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Card}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
   
+  // Detect which template is being used based on tags present
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
-  // First, collect ALL placeholder occurrences before any modifications
-  var allPhotoOccurrences = [];
   for (var j = 0; j < useMap.length; j++) {
-    allPhotoOccurrences.push({
-      tag: useMap[j],
-      occurrences: findAllTagOccurrences(useMap[j]),
-      photoData: (photos && j < photos.length) ? photos[j].data : null
-    });
-  }
-
-  // Then, process all replacements
-  for (var k = 0; k < allPhotoOccurrences.length; k++) {
-    var photoInfo = allPhotoOccurrences[k];
-    var occurrences = photoInfo.occurrences;
-    var photoData = photoInfo.photoData;
-    
-    for (var m = 0; m < occurrences.length; m++) {
-      var occ = occurrences[m];
-      
-      if (photoData) {
-        // FIX: Create a clean header name (e.g., "{{Image_Front}}" becomes "Front:")
-        var cleanHeader = photoInfo.tag.replace("{{Image_", "").replace("}}", "").replace(/_/g, " ") + ":";
-        
-        // Update the text to be the Header + Newline (prevents removing it)
-        occ.element.asText().setText(cleanHeader + "\n");
-        
-        // Insert image
-        var imgBlob = Utilities.newBlob(Utilities.base64Decode(photoData), 'image/png');
-        var img = occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob);
-        
-        // FIX: Make image larger and allow height to scale automatically
-        img.setWidth(450); 
-        // We do NOT setHeight here, so it keeps the correct aspect ratio
-        
-      } else {
-        // Replace with "No photo provided" text
-        var cleanHeader = photoInfo.tag.replace("{{Image_", "").replace("}}", "").replace(/_/g, " ");
-        occ.element.asText().setText(cleanHeader + ": No photo provided\n");
-      }
-    }
+    var photoData = (photos && j < photos.length) ? photos[j].data : null;
+    replaceImageTagWithHeader(useMap[j], photoData);
   }
 
   doc.saveAndClose();
@@ -499,9 +493,10 @@ function calculateWorkMinutesServer(start, end, taskName) {
   if (!start || !end) return 0;
   
   // POWDER COATING EXCEPTION: 24/7
-  if (taskName && taskName.toLowerCase().includes('powder')) {
+  if (taskName && taskName.toLowerCase().trim() === 'powder coating') {
     return (end.getTime() - start.getTime()) / 1000 / 60;
   }
+
 
   // STANDARD LOGIC: Mon-Fri, 07:30-15:45
   var totalMinutes = 0;
@@ -575,8 +570,10 @@ function getNextStatus(current) {
     "ready for welding", "welding", 
     "ready for grinding", "grinding", 
     "ready for pre-powder coating", "pre-powder coating",
+    "ready for powder coating", // <--- ADDED THIS STEP
     "powder coating", 
     "ready for assembly", "assembly", 
+    "ready for final qc", "final qc",
     "ready for delivery", "out for delivery", 
     "delivered"
   ];
