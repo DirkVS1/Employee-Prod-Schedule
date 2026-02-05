@@ -14,24 +14,19 @@
     :root { --sd-bg: #EBEAE6; --sd-text: #1a1a1a; --sd-accent: #000000; --sd-white: #ffffff; }
     body { background-color: var(--sd-bg); color: var(--sd-text); font-family: 'Lato', sans-serif; overflow-x: hidden; }
     h1, h2, h3, h4, h5, .brand-font { font-family: 'Playfair Display', serif; color: var(--sd-accent); }
-    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 60px; background: white; z-index: 1000; transition: width 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.1); padding-top: 70px; overflow-x: hidden; }
-    .sidebar.active { width: 260px; }
-    .sidebar-link { display: flex; align-items: center; padding: 15px 10px; color: #333; text-decoration: none; font-weight: bold; border-left: 4px solid transparent; cursor: pointer; white-space: nowrap; }
-    .sidebar-link i { min-width: 40px; text-align: center; font-size: 1.2rem; }
-    .sidebar-link .link-text { opacity: 0; transition: opacity 0.2s ease; }
-    .sidebar.active .sidebar-link .link-text { opacity: 1; }
-    .sidebar-link:hover { background-color: #f0f0f0; }
-    .sidebar-link.active { background: #f8f9fa; border-left-color: black; }
-    .menu-toggle { position: fixed; top: 15px; left: 15px; z-index: 1100; background: white; border: none; padding: 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: left 0.3s ease; }
-    .menu-toggle.active { left: 215px; } /* Adjusted for expanded sidebar */
+    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 120px; background: white; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.1); padding: 20px 10px; overflow-y: auto; display: flex; flex-direction: column; }
+    .sidebar-link { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px 10px; margin-bottom: 10px; color: #333; text-decoration: none; font-weight: 500; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; }
+    .sidebar-link i { font-size: 1.8rem; margin-bottom: 8px; }
+    .sidebar-link .link-text { font-size: 0.75rem; text-align: center; line-height: 1.2; }
+    .sidebar-link:hover { background-color: #f0f0f0; transform: translateY(-2px); }
+    .sidebar-link.active { background: #f8f9fa; border: 2px solid black; }
     
     /* Main content area offset for sidebar */
-    .main-content { margin-left: 60px; transition: margin-left 0.3s ease; }
-    .main-content.expanded { margin-left: 260px; }
+    .main-content { margin-left: 120px; }
     
-    /* Sidebar header and footer visibility */
-    .sidebar-header, .sidebar-footer { opacity: 0; transition: opacity 0.2s ease; }
-    .sidebar.active .sidebar-header, .sidebar.active .sidebar-footer { opacity: 1; }
+    /* Sidebar header and footer always visible */
+    .sidebar-header { margin-bottom: 20px; text-align: center; }
+    .sidebar-footer { margin-top: auto; padding-top: 20px; }
     .card { border: none; border-radius: 4px; background-color: var(--sd-white); box-shadow: 0 4px 12px rgba(0,0,0,0.03); transition: all 0.3s ease; }
     .role-card:active { transform: scale(0.98); }
     
@@ -69,17 +64,13 @@
       h4 { font-size: 1.1rem; }
       
       /* Sidebar adjustments for mobile */
-      .sidebar { width: 60px; }
-      .sidebar.active { width: 280px; max-width: 85vw; }
-      .sidebar-link { padding: 12px 10px; font-size: 0.95rem; }
+      .sidebar { width: 100px; }
+      .sidebar-link { padding: 12px 8px; font-size: 0.85rem; }
+      .sidebar-link i { font-size: 1.5rem; margin-bottom: 6px; }
+      .sidebar-link .link-text { font-size: 0.7rem; }
       
       /* Main content adjustment for mobile */
-      .main-content { margin-left: 0; }
-      .main-content.expanded { margin-left: 0; }
-      
-      /* Menu toggle button larger for easier touch */
-      .menu-toggle { padding: 12px; top: 10px; left: 10px; }
-      .menu-toggle i { font-size: 1.5rem; }
+      .main-content { margin-left: 100px; }
       
       /* Cards stack better on mobile */
       .card { margin-bottom: 1rem; }
@@ -139,33 +130,31 @@
     <div class="spinner-border text-dark"></div>
   </div>
 
-  <button class="menu-toggle" id="menuToggle" onclick="toggleSidebar()"><i class="bi bi-list fs-4"></i></button>
-
   <div class="sidebar" id="sidebar">
-    <div class="px-4 mb-4 sidebar-header">
-      <h4 class="brand-font">MENU</h4>
+    <div class="sidebar-header">
+      <h5 class="brand-font mb-0" style="font-size: 0.9rem;">STUDIO DELTA</h5>
     </div>
     <a id="link-roles" class="sidebar-link active" onclick="navTo('view-roles')">
       <i class="bi bi-house-door"></i>
-      <span class="link-text">Home / Roles</span>
+      <span class="link-text">Home</span>
     </a>
     <div id="adminLinks" class="d-none-view">
       <a id="link-prod" class="sidebar-link" onclick="loadProductionOverview()">
         <i class="bi bi-clipboard-data"></i>
-        <span class="link-text">Production Overview</span>
+        <span class="link-text">Production</span>
       </a>
       <a id="link-work" class="sidebar-link" onclick="loadWorkerStats()">
         <i class="bi bi-people"></i>
-        <span class="link-text">Worker Information</span>
+        <span class="link-text">Workers</span>
       </a>
     </div>
-    <div class="mt-auto px-2 pt-5 sidebar-footer">
-      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()">Log Out</button>
+    <div class="sidebar-footer">
+      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()" style="font-size: 0.75rem; padding: 0.5rem;">Log Out</button>
     </div>
   </div>
 
   <div class="main-content" id="mainContent">
-  <div class="container-fluid py-5" style="padding-top: 80px;">
+  <div class="container-fluid py-5" style="padding-top: 40px;">
     
     <div id="view-roles" class="view-section container">
       <div class="text-center mb-5"><h1 class="display-4 fw-bold">Studio Delta</h1><p class="text-muted small text-uppercase">Production Management System</p></div>
@@ -314,15 +303,6 @@
     function showAlert(msg) { document.getElementById('alertMsg').innerText = msg; alertModal.show(); }
     function showConfirm(msg, cb) { document.getElementById('confirmMsg').innerText = msg; confirmCallback = cb; confirmModal.show(); }
 
-    function toggleSidebar() { 
-      const sidebar = document.getElementById('sidebar');
-      const menuToggle = document.getElementById('menuToggle');
-      const mainContent = document.getElementById('mainContent');
-      
-      sidebar.classList.toggle('active');
-      menuToggle.classList.toggle('active');
-      mainContent.classList.toggle('expanded');
-    }
     function navTo(viewId) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.add('d-none-view'));
       document.getElementById(viewId).classList.remove('d-none-view');
@@ -332,7 +312,6 @@
       if(viewId === 'view-admin-prod') linkId = 'link-prod';
       if(viewId === 'view-admin-workers') linkId = 'link-work';
       const linkEl = document.getElementById(linkId); if(linkEl) linkEl.classList.add('active');
-      // Sidebar remains open/closed as user prefers - no auto-close
       if(viewId !== 'view-dashboard') stopAutoRefresh();
     }
 
