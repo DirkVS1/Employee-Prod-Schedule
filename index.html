@@ -14,15 +14,22 @@
     :root { --sd-bg: #EBEAE6; --sd-text: #1a1a1a; --sd-accent: #000000; --sd-white: #ffffff; }
     body { background-color: var(--sd-bg); color: var(--sd-text); font-family: 'Lato', sans-serif; overflow-x: hidden; }
     h1, h2, h3, h4, h5, .brand-font { font-family: 'Playfair Display', serif; color: var(--sd-accent); }
-    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 260px; background: white; z-index: 1000; transform: translateX(-100%); transition: transform 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.1); padding-top: 70px; }
-    .sidebar.active { transform: translateX(0); }
-    .sidebar-link { display: block; padding: 15px 25px; color: #333; text-decoration: none; font-weight: bold; border-left: 4px solid transparent; cursor: pointer; }
+    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 60px; background: white; z-index: 1000; transition: width 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.1); padding-top: 70px; overflow-x: hidden; }
+    .sidebar.active { width: 260px; }
+    .sidebar-link { display: flex; align-items: center; padding: 15px 10px; color: #333; text-decoration: none; font-weight: bold; border-left: 4px solid transparent; cursor: pointer; white-space: nowrap; }
+    .sidebar-link i { min-width: 40px; text-align: center; font-size: 1.2rem; }
+    .sidebar-link .link-text { opacity: 0; transition: opacity 0.2s ease; }
+    .sidebar.active .sidebar-link .link-text { opacity: 1; }
     .sidebar-link:hover { background-color: #f0f0f0; }
     .sidebar-link.active { background: #f8f9fa; border-left-color: black; }
     .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
-    .sidebar-overlay.active { display: block; }
-    .menu-toggle { position: fixed; top: 15px; left: 15px; z-index: 1100; background: white; border: none; padding: 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.3s ease; }
-    .menu-toggle.active { transform: translateX(260px); }
+    .sidebar-overlay.active { display: none; } /* No overlay needed for persistent sidebar */
+    .menu-toggle { position: fixed; top: 15px; left: 15px; z-index: 1100; background: white; border: none; padding: 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: left 0.3s ease; }
+    .menu-toggle.active { left: 215px; } /* Adjusted for expanded sidebar */
+    
+    /* Main content area offset for sidebar */
+    .main-content { margin-left: 60px; transition: margin-left 0.3s ease; }
+    .main-content.expanded { margin-left: 260px; }
     .card { border: none; border-radius: 4px; background-color: var(--sd-white); box-shadow: 0 4px 12px rgba(0,0,0,0.03); transition: all 0.3s ease; }
     .role-card:active { transform: scale(0.98); }
     
@@ -60,8 +67,13 @@
       h4 { font-size: 1.1rem; }
       
       /* Sidebar adjustments for mobile */
-      .sidebar { width: 280px; max-width: 85vw; }
-      .sidebar-link { padding: 12px 20px; font-size: 0.95rem; }
+      .sidebar { width: 60px; }
+      .sidebar.active { width: 280px; max-width: 85vw; }
+      .sidebar-link { padding: 12px 10px; font-size: 0.95rem; }
+      
+      /* Main content adjustment for mobile */
+      .main-content { margin-left: 0; }
+      .main-content.expanded { margin-left: 0; }
       
       /* Menu toggle button larger for easier touch */
       .menu-toggle { padding: 12px; top: 10px; left: 10px; }
@@ -128,16 +140,28 @@
   <button class="menu-toggle" id="menuToggle" onclick="toggleSidebar()"><i class="bi bi-list fs-4"></i></button>
 
   <div class="sidebar" id="sidebar">
-    <div class="px-4 mb-4"><h4 class="brand-font">MENU</h4></div>
-    <a id="link-roles" class="sidebar-link active" onclick="navTo('view-roles')">Home / Roles</a>
+    <div class="px-4 mb-4" style="opacity: 0; transition: opacity 0.2s;"><h4 class="brand-font" id="sidebarTitle">MENU</h4></div>
+    <a id="link-roles" class="sidebar-link active" onclick="navTo('view-roles')">
+      <i class="bi bi-house-door"></i>
+      <span class="link-text">Home / Roles</span>
+    </a>
     <div id="adminLinks" class="d-none-view">
-      <a id="link-prod" class="sidebar-link" onclick="loadProductionOverview()">Production Overview</a>
-      <a id="link-work" class="sidebar-link" onclick="loadWorkerStats()">Worker Information</a>
+      <a id="link-prod" class="sidebar-link" onclick="loadProductionOverview()">
+        <i class="bi bi-clipboard-data"></i>
+        <span class="link-text">Production Overview</span>
+      </a>
+      <a id="link-work" class="sidebar-link" onclick="loadWorkerStats()">
+        <i class="bi bi-people"></i>
+        <span class="link-text">Worker Information</span>
+      </a>
     </div>
-    <div class="mt-auto px-4 pt-5"><button class="btn btn-outline-danger w-100" onclick="logout()">Log Out</button></div>
+    <div class="mt-auto px-2 pt-5" style="opacity: 0; transition: opacity 0.2s;" id="logoutBtn">
+      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()">Log Out</button>
+    </div>
   </div>
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
+  <div class="main-content" id="mainContent">
   <div class="container-fluid py-5" style="padding-top: 80px;">
     
     <div id="view-roles" class="view-section container">
@@ -193,6 +217,7 @@
         <div class="col-md-8"><div id="workerDetailContent" class="bg-white p-4 rounded shadow-sm"><p class="text-muted text-center">Select a worker.</p></div></div>
       </div>
     </div>
+  </div>
   </div>
 
   <div class="modal fade" id="passModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content text-center p-4"><h3 class="mb-3">Access Code</h3><p class="text-muted" id="passPromptName">Enter code</p><input type="password" id="inputPass" class="form-control text-center mb-3"><button class="btn btn-primary w-100" onclick="submitPass()">ENTER</button></div></div></div>
@@ -287,9 +312,24 @@
     function showConfirm(msg, cb) { document.getElementById('confirmMsg').innerText = msg; confirmCallback = cb; confirmModal.show(); }
 
     function toggleSidebar() { 
-      document.getElementById('sidebar').classList.toggle('active'); 
-      document.getElementById('sidebarOverlay').classList.toggle('active'); 
-      document.getElementById('menuToggle').classList.toggle('active'); 
+      const sidebar = document.getElementById('sidebar');
+      const menuToggle = document.getElementById('menuToggle');
+      const mainContent = document.getElementById('mainContent');
+      const sidebarTitle = document.querySelector('#sidebar > div:first-child');
+      const logoutBtn = document.getElementById('logoutBtn');
+      
+      sidebar.classList.toggle('active');
+      menuToggle.classList.toggle('active');
+      mainContent.classList.toggle('expanded');
+      
+      // Toggle visibility of title and logout button
+      if (sidebar.classList.contains('active')) {
+        sidebarTitle.style.opacity = '1';
+        logoutBtn.style.opacity = '1';
+      } else {
+        sidebarTitle.style.opacity = '0';
+        logoutBtn.style.opacity = '0';
+      }
     }
     function navTo(viewId) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.add('d-none-view'));
@@ -300,9 +340,7 @@
       if(viewId === 'view-admin-prod') linkId = 'link-prod';
       if(viewId === 'view-admin-workers') linkId = 'link-work';
       const linkEl = document.getElementById(linkId); if(linkEl) linkEl.classList.add('active');
-      document.getElementById('sidebar').classList.remove('active');
-      document.getElementById('sidebarOverlay').classList.remove('active');
-      document.getElementById('menuToggle').classList.remove('active');
+      // Sidebar remains open/closed as user prefers - no auto-close
       if(viewId !== 'view-dashboard') stopAutoRefresh();
     }
 
