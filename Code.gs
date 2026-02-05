@@ -352,7 +352,20 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
 
 function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, photos) {
   var folder = getFolder();
+  
+  // Get the template file and ensure we're accessing the latest version
+  // by opening and immediately closing it before copying
   var templateFile = DriveApp.getFileById(templateId);
+  
+  // Force a refresh by opening the document first
+  try {
+    var tempDoc = DocumentApp.openById(templateId);
+    tempDoc.saveAndClose(); // This ensures we get the latest saved version
+  } catch(e) {
+    // If opening fails, just log and continue with the copy
+    Logger.log("Could not open template for refresh: " + e.toString());
+  }
+  
   var newFile = templateFile.makeCopy(orderNum + "_QC_" + new Date().toISOString().slice(0,10), folder);
   var doc = DocumentApp.openById(newFile.getId());
   var body = doc.getBody();
@@ -369,36 +382,69 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
     }
   }
 
-  // Helper to insert image
-  function replaceImageTag(tag, base64Data) {
-    var r = body.findText(tag);
-    if (r) {
-      var element = r.getElement();
+  // Helper to find all occurrences of a tag and store their info
+  function findAllTagOccurrences(tag) {
+    var occurrences = [];
+    var searchResult = body.findText(tag);
+    while (searchResult !== null) {
+      var element = searchResult.getElement();
       var parent = element.getParent();
-      if (base64Data) {
-        // Insert image
-        var imgBlob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/png');
-        parent.insertInlineImage(parent.getChildIndex(element)+1, imgBlob).setWidth(200).setHeight(200);
-        // Remove text tag
-        element.removeFromParent();
-      } else {
-        // Replace with "No photo provided" text
-        element.asText().setText(tag.replace(/\{\{|\}\}/g, '') + ": No photo provided");
-      }
+      var childIndex = parent.getChildIndex(element);
+      occurrences.push({
+        element: element,
+        parent: parent,
+        childIndex: childIndex
+      });
+      searchResult = body.findText(tag, searchResult);
     }
+    return occurrences;
   }
 
   // 3. Signature
-  if (sigBase64) replaceImageTag("{{Signature}}", sigBase64.split(',')[1]);
+  if (sigBase64) {
+    var sigOccurrences = findAllTagOccurrences("{{Signature}}");
+    var sigData = sigBase64.split(',')[1];
+    for (var s = 0; s < sigOccurrences.length; s++) {
+      var occ = sigOccurrences[s];
+      var imgBlob = Utilities.newBlob(Utilities.base64Decode(sigData), 'image/png');
+      occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob).setWidth(200).setHeight(200);
+      occ.element.removeFromParent();
+    }
+  }
 
   // 4. Photos
   var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}", "{{Image_Open}}", "{{Image_SpriritLevel}}"];
   var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Card}}", "{{Image_Open}}", "{{Image_SpriritLevel}}"];
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
+  // First, collect ALL placeholder occurrences before any modifications
+  var allPhotoOccurrences = [];
   for (var j = 0; j < useMap.length; j++) {
-    var photoData = (photos && j < photos.length) ? photos[j].data : null;
-    replaceImageTag(useMap[j], photoData);
+    allPhotoOccurrences.push({
+      tag: useMap[j],
+      occurrences: findAllTagOccurrences(useMap[j]),
+      photoData: (photos && j < photos.length) ? photos[j].data : null
+    });
+  }
+
+  // Then, process all replacements
+  for (var k = 0; k < allPhotoOccurrences.length; k++) {
+    var photoInfo = allPhotoOccurrences[k];
+    var occurrences = photoInfo.occurrences;
+    var photoData = photoInfo.photoData;
+    
+    for (var m = 0; m < occurrences.length; m++) {
+      var occ = occurrences[m];
+      if (photoData) {
+        // Insert image
+        var imgBlob = Utilities.newBlob(Utilities.base64Decode(photoData), 'image/png');
+        occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob).setWidth(200).setHeight(200);
+        occ.element.removeFromParent();
+      } else {
+        // Replace with "No photo provided" text
+        occ.element.asText().setText(photoInfo.tag.replace(/\{\{|\}\}/g, '') + ": No photo provided");
+      }
+    }
   }
 
   doc.saveAndClose();
