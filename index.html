@@ -26,7 +26,9 @@
     
     /* Sidebar header and footer always visible */
     .sidebar-header { margin-bottom: 20px; text-align: center; }
+    .sidebar-header h5 { font-size: 0.9rem; }
     .sidebar-footer { margin-top: auto; padding-top: 20px; }
+    .sidebar-footer .btn { font-size: 0.75rem; padding: 0.5rem; }
     .card { border: none; border-radius: 4px; background-color: var(--sd-white); box-shadow: 0 4px 12px rgba(0,0,0,0.03); transition: all 0.3s ease; }
     .role-card:active { transform: scale(0.98); }
     
@@ -132,7 +134,7 @@
 
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <h5 class="brand-font mb-0" style="font-size: 0.9rem;">STUDIO DELTA</h5>
+      <h5 class="brand-font mb-0">STUDIO DELTA</h5>
     </div>
     <a id="link-roles" class="sidebar-link active" onclick="navTo('view-roles')">
       <i class="bi bi-house-door"></i>
@@ -149,7 +151,7 @@
       </a>
     </div>
     <div class="sidebar-footer">
-      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()" style="font-size: 0.75rem; padding: 0.5rem;">Log Out</button>
+      <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()">Log Out</button>
     </div>
   </div>
 
