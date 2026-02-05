@@ -158,14 +158,45 @@
       'Tagging': ["Drawing matches desc?", "Mistakes corrected?", "Measurements match?", "Frame square?", "Glass fits?"],
       'Welding': ["Tag spots welded?", "Plates welded flush?", "No dents/scratches?", "Frame still square?", "Glass fits?"],
       'Grinding': ["Welds ground flush?", "No deep scratches?", "Surface smooth?", "Ready for coating?"],
+      
+      // PRE-POWDER (Standard QC Role)
       'Quality Control': ["Does the unit match the description of the Job Card?", "If there is a drawing, does the unit match the drawing?", "Is the frame square?", "Will the glass fit?", "Are the overall dimensions correct?", "Are all the required welding spots welded?", "Have all welding spots been grinded and polished?", "Does the hinges have enough clearance for the doors to open properly?", "Are the welds on the bullet hinges adequately strong?", "Are the plates free from dents, holes and weld marks?", "Are weld areas free from spatter and holes?", "Is the overall grinding of the unit uniform and smooth?", "Have powder coating stickers been placed on the unit?", "Do the stickers colour match the colour of the job card?"],
-      'Assembly': ["Paint free of scratches?", "Have the edges of the backboard been smoothed out?", "No lines visible on back board paint?", "Glass free of scratches?", "All screws flush and level?", "Glass clips straight and level with one another?", "All doors straight and level?", "Doors opening easily?", "Magnets straight and level?", "End caps fitted?", "Glass shelves checked and fitted?", "Product Level?"]
+      
+      // NEW: POST ASSEMBLE CHECKLIST (From your image - No Photos/PDF)
+      'Assembly': [
+        "Did you cut and paint the backboard before fitting the glass?",
+        "Did you fit the glass and make sure the glass clips align?",
+        "Did you fit the handles, magnets and End Caps?",
+        "Are the magnets and handles aligned and free of scratches?",
+        "Did you fit the back board and make sure the screws are hidden?",
+        "Did you wipe down the unit and remove excess silicon?",
+        "Did you place rubber bumpers on the glass shelves and magnets?",
+        "Did you level the unit for QC?",
+        "Did you notify the cleaner that the unit is ready to be cleaned?"
+      ],
+
+      // NEW: FINAL QC (Old Assembly Checklist - Generates PDF)
+      'Final QC': [
+        "Paint free of scratches?", 
+        "Have the edges of the backboard been smoothed out?", 
+        "No lines visible on back board paint?", 
+        "Glass free of scratches?", 
+        "All screws flush and level?", 
+        "Glass clips straight and level with one another?", 
+        "All doors straight and level?", 
+        "Doors opening easily?", 
+        "Magnets straight and level?", 
+        "End caps fitted?", 
+        "Glass shelves checked and fitted?", 
+        "Product Level?"
+      ]
     };
 
     // --- PHOTO REQUIREMENTS ---
     const PHOTO_REQS = {
       'Quality Control': ['Front', 'Side', 'Other Side', 'Back', 'Open', 'Spirit Level'],
-      'Assembly': ['Product Level', 'Back', 'Side', 'Other Side', 'Job Card', 'Open','Spirit Level']
+      // Assembly now has NO photos
+      'Final QC': ['Product Level', 'Back', 'Side', 'Other Side', 'Job Card', 'Open','Spirit Level']
     };
 
     let passModal, startModal, qcModal, alertModal, confirmModal, canvas, ctx, isDrawing = false;
@@ -277,7 +308,12 @@
     }
     function startAutoRefresh() {
       if (refreshInterval) clearInterval(refreshInterval);
-      refreshInterval = setInterval(() => { if (!document.querySelector('.modal.show')) loadDashboard(true); }, 30000); 
+      refreshInterval = setInterval(() => { 
+        // Don't refresh if a modal is open OR if we are currently submitting data
+        if (!document.querySelector('.modal.show') && !isSubmitting) {
+            loadDashboard(true); 
+        }
+      }, 30000); 
     }
     function stopAutoRefresh() { if (refreshInterval) clearInterval(refreshInterval); }
 
@@ -337,9 +373,33 @@
     function preFinish(row, ord) { 
       session.pendingRow = row; 
       session.activeOrder = ord; 
-      if(session.role === 'Grinding') { showConfirm("Finish Grinding?", () => submitQC(true)); return; }
       
-      const qs = QC_DATA[session.role] || QC_DATA['Profile Cutting']; 
+      // 1. GET STATUS FROM CARD BADGE
+      const card = document.getElementById(`card-${row}`);
+      const statusText = card ? card.querySelector('.badge.bg-dark').innerText.toLowerCase().trim() : "";
+      
+      // 2. DETERMINE WHICH CHECKLIST TO USE
+      let qcKey = 'Profile Cutting'; // Default fallback
+      
+      if (statusText === 'final qc') {
+          qcKey = 'Final QC';
+      } else if (statusText === 'assembly') {
+          qcKey = 'Assembly';
+      } else if (QC_DATA[session.role]) {
+          qcKey = session.role;
+      }
+      
+      session.currentQcKey = qcKey; 
+      
+      // 3. EXCEPTIONS: GRINDING, POWDER COATING & DELIVERY (Skip Checklist)
+      // Added "out for delivery" here so it skips the popup form
+      if(session.role === 'Grinding' || statusText === 'powder coating' || statusText === 'out for delivery') { 
+        showConfirm("Finish " + (statusText || "Task") + "?", () => submitQC(true)); 
+        return; 
+      }
+      
+      // 4. GENERATE CHECKLIST HTML
+      const qs = QC_DATA[qcKey] || QC_DATA['Profile Cutting']; 
       let h = ''; 
       qs.forEach((q,i) => {
         h += `<div class="mb-3 border-bottom pb-2"><div class="fw-bold mb-1">${q}</div><div class="btn-group w-100" role="group"><input type="radio" class="btn-check" name="q${i}" id="q${i}y" value="Y" autocomplete="off"><label class="btn btn-outline-success" for="q${i}y">YES</label><input type="radio" class="btn-check" name="q${i}" id="q${i}n" value="N" autocomplete="off"><label class="btn btn-outline-danger" for="q${i}n">NO</label></div></div>`;
@@ -347,11 +407,12 @@
       document.getElementById('qcChecklistContainer').innerHTML = h;
       document.getElementById('qcOrderNum').innerText = ord;
       
-      // PHOTO INPUTS
-      const reqPhotos = PHOTO_REQS[session.role];
+      // 5. PHOTO INPUTS
+      const reqPhotos = PHOTO_REQS[qcKey]; 
       const phContainer = document.getElementById('qcPhotoContainer');
       const phInputs = document.getElementById('qcPhotoInputs');
       phInputs.innerHTML = '';
+      
       if(reqPhotos) {
         phContainer.classList.remove('d-none');
         reqPhotos.forEach((label, idx) => {
@@ -366,48 +427,113 @@
     }
 
     async function submitQC(skip=false) {
-      if(isSubmitting) return;
-      let d = [], sig = '', fileData = [];
-      if(!skip) {
-        const qs = QC_DATA[session.role] || QC_DATA['Profile Cutting'];
-        let allAnswered = true;
-        qs.forEach((q,i) => { const el = document.querySelector(`input[name="q${i}"]:checked`); if(!el) allAnswered=false; else d.push({q:q, a:el.value}); });
-        if(!allAnswered) { showAlert("Please answer all questions."); return; }
-        if(!hasSigned) { showAlert("Please sign before confirming."); return; } 
-        sig = canvas.toDataURL();
-        
-        // GATHER PHOTOS
-        const inputs = document.querySelectorAll('.photo-input');
-        for(let input of inputs) {
-            if(input.files.length > 0) {
-                let b64 = await toBase64(input.files[0]);
-                fileData.push({
-                    name: input.files[0].name,
-                    mime: input.files[0].type,
-                    data: b64.split(',')[1] // remove prefix
-                });
-            }
-        }
-      }
-      isSubmitting = true;
-      qcModal.hide();
-      const card = document.getElementById(`card-${session.pendingRow}`);
-      if(card) { card.style.opacity='0.5'; setTimeout(()=>card.remove(), 500); }
+      if(isSubmitting) return; // Prevent double clicks
       
-      google.script.run
-        .withSuccessHandler((result) => { 
-          isSubmitting=false;
-          if(result && result.success === false) {
-            showAlert("Error completing order: " + (result.error || "Unknown error"));
+      let d = [], sig = '', fileData = [];
+      const card = document.getElementById(`card-${session.pendingRow}`);
+
+      try {
+          if(!skip) {
+            // 1. GET THE EXACT LIST WE GENERATED EARLIER
+            const qcKey = session.currentQcKey || 'Profile Cutting';
+            const qs = QC_DATA[qcKey]; 
+            
+            // 2. VALIDATE ANSWERS
+            let allAnswered = true;
+            qs.forEach((q,i) => { 
+                const el = document.querySelector(`input[name="q${i}"]:checked`); 
+                if(!el) {
+                    allAnswered = false; 
+                } else {
+                    d.push({q:q, a:el.value}); 
+                }
+            });
+            
+            if(!allAnswered) { showAlert("Please answer all questions."); return; }
+            if(!hasSigned) { showAlert("Please sign before confirming."); return; } 
+            
+            sig = canvas.toDataURL();
+            
+            // 3. GATHER PHOTOS
+            const inputs = document.querySelectorAll('.photo-input');
+            for(let input of inputs) {
+                if(input.files.length > 0) {
+                    let b64 = await toBase64(input.files[0]);
+                    fileData.push({
+                        name: input.files[0].name,
+                        mime: input.files[0].type,
+                        data: b64.split(',')[1] 
+                    });
+                }
+            }
           }
-          loadDashboard(true);
-        })
-        .withFailureHandler((error) => {
-          isSubmitting=false;
-          showAlert("Error: " + error);
-          loadDashboard(true);
-        })
-        .finishOrder(session.pendingRow, session.logId, d, sig, fileData);
+          
+          // 4. UI FEEDBACK: SHOW LOADING STATE
+          isSubmitting = true;
+          qcModal.hide();
+          
+          if(card) {
+             const btn = card.querySelector('button');
+             if(btn) {
+                 // Change button text and add spinner
+                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>GENERATING PDF...';
+                 // Make it look grey/disabled
+                 btn.classList.remove('btn-success', 'btn-primary');
+                 btn.classList.add('btn-secondary');
+                 btn.disabled = true;
+             }
+             // Ensure opacity is full so you can read the "Generating PDF" text
+             card.style.opacity = '1';
+          }
+          
+          // 5. SEND TO SERVER
+          google.script.run
+            .withSuccessHandler((result) => { 
+              isSubmitting = false;
+              if(result && result.success === false) {
+                showAlert("Error: " + (result.error || "Unknown"));
+                // Reset button if error
+                if(card) {
+                    const btn = card.querySelector('button');
+                    if(btn) {
+                        btn.innerHTML = 'FINISH & QC';
+                        btn.classList.add('btn-success');
+                        btn.classList.remove('btn-secondary');
+                        btn.disabled = false;
+                    }
+                }
+              }
+              loadDashboard(true);
+            })
+            .withFailureHandler((error) => {
+              isSubmitting = false;
+              showAlert("System Error: " + error);
+              // Reset button if error
+              if(card) {
+                  const btn = card.querySelector('button');
+                  if(btn) {
+                      btn.innerHTML = 'FINISH & QC';
+                      btn.classList.add('btn-success');
+                      btn.classList.remove('btn-secondary');
+                      btn.disabled = false;
+                  }
+              }
+              loadDashboard(true);
+            })
+            .finishOrder(session.pendingRow, session.logId, d, sig, fileData);
+
+      } catch (err) {
+          isSubmitting = false;
+          console.error(err);
+          showAlert("Client Error: " + err.message);
+          // Reset button if client error (like photo issue)
+          if(card) {
+              const btn = card.querySelector('button');
+              if(btn) {
+                  btn.disabled = false;
+              }
+          }
+      }
     }
 
     function toBase64(file) {
@@ -426,7 +552,7 @@
       let totalMinutes = 0;
       let current = new Date(start.getTime());
       
-      if (taskName && taskName.toLowerCase().includes('powder')) {
+      if (taskName && taskName.toLowerCase().trim() === 'powder coating') {
         return (end - start) / 1000 / 60;
       }
 
