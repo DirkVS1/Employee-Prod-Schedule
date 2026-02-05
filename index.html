@@ -22,14 +22,16 @@
     .sidebar.active .sidebar-link .link-text { opacity: 1; }
     .sidebar-link:hover { background-color: #f0f0f0; }
     .sidebar-link.active { background: #f8f9fa; border-left-color: black; }
-    .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
-    .sidebar-overlay.active { display: none; } /* No overlay needed for persistent sidebar */
     .menu-toggle { position: fixed; top: 15px; left: 15px; z-index: 1100; background: white; border: none; padding: 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: left 0.3s ease; }
     .menu-toggle.active { left: 215px; } /* Adjusted for expanded sidebar */
     
     /* Main content area offset for sidebar */
     .main-content { margin-left: 60px; transition: margin-left 0.3s ease; }
     .main-content.expanded { margin-left: 260px; }
+    
+    /* Sidebar header and footer visibility */
+    .sidebar-header, .sidebar-footer { opacity: 0; transition: opacity 0.2s ease; }
+    .sidebar.active .sidebar-header, .sidebar.active .sidebar-footer { opacity: 1; }
     .card { border: none; border-radius: 4px; background-color: var(--sd-white); box-shadow: 0 4px 12px rgba(0,0,0,0.03); transition: all 0.3s ease; }
     .role-card:active { transform: scale(0.98); }
     
@@ -140,7 +142,9 @@
   <button class="menu-toggle" id="menuToggle" onclick="toggleSidebar()"><i class="bi bi-list fs-4"></i></button>
 
   <div class="sidebar" id="sidebar">
-    <div class="px-4 mb-4" style="opacity: 0; transition: opacity 0.2s;"><h4 class="brand-font" id="sidebarTitle">MENU</h4></div>
+    <div class="px-4 mb-4 sidebar-header">
+      <h4 class="brand-font">MENU</h4>
+    </div>
     <a id="link-roles" class="sidebar-link active" onclick="navTo('view-roles')">
       <i class="bi bi-house-door"></i>
       <span class="link-text">Home / Roles</span>
@@ -155,11 +159,10 @@
         <span class="link-text">Worker Information</span>
       </a>
     </div>
-    <div class="mt-auto px-2 pt-5" style="opacity: 0; transition: opacity 0.2s;" id="logoutBtn">
+    <div class="mt-auto px-2 pt-5 sidebar-footer">
       <button class="btn btn-outline-danger w-100 btn-sm" onclick="logout()">Log Out</button>
     </div>
   </div>
-  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
   <div class="main-content" id="mainContent">
   <div class="container-fluid py-5" style="padding-top: 80px;">
@@ -315,21 +318,10 @@
       const sidebar = document.getElementById('sidebar');
       const menuToggle = document.getElementById('menuToggle');
       const mainContent = document.getElementById('mainContent');
-      const sidebarTitle = document.querySelector('#sidebar > div:first-child');
-      const logoutBtn = document.getElementById('logoutBtn');
       
       sidebar.classList.toggle('active');
       menuToggle.classList.toggle('active');
       mainContent.classList.toggle('expanded');
-      
-      // Toggle visibility of title and logout button
-      if (sidebar.classList.contains('active')) {
-        sidebarTitle.style.opacity = '1';
-        logoutBtn.style.opacity = '1';
-      } else {
-        sidebarTitle.style.opacity = '0';
-        logoutBtn.style.opacity = '0';
-      }
     }
     function navTo(viewId) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.add('d-none-view'));
