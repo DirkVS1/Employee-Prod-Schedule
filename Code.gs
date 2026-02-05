@@ -450,8 +450,8 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
         var imgBlob = Utilities.newBlob(Utilities.base64Decode(photoData), 'image/png');
         var img = occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob);
         
-        // FIX: Make image larger and allow height to scale automatically
-        img.setWidth(450); 
+        // Set image to a reasonable size while maintaining aspect ratio
+        img.setWidth(300); 
         // We do NOT setHeight here, so it keeps the correct aspect ratio
         
       } else {
@@ -575,7 +575,7 @@ function getNextStatus(current) {
     "ready for welding", "welding", 
     "ready for grinding", "grinding", 
     "ready for pre-powder coating", "pre-powder coating",
-    "powder coating", 
+    "ready for powder coating", "powder coating", 
     "ready for assembly", "assembly", 
     "ready for delivery", "out for delivery", 
     "delivered"

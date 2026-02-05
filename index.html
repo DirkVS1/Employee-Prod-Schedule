@@ -337,7 +337,6 @@
     function preFinish(row, ord) { 
       session.pendingRow = row; 
       session.activeOrder = ord; 
-      if(session.role === 'Grinding') { showConfirm("Finish Grinding?", () => submitQC(true)); return; }
       
       const qs = QC_DATA[session.role] || QC_DATA['Profile Cutting']; 
       let h = ''; 
