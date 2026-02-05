@@ -291,9 +291,9 @@
 
     // --- PHOTO REQUIREMENTS ---
     const PHOTO_REQS = {
-      'Quality Control': ['Front', 'Side', 'Other Side', 'Back', 'Open', 'Spirit Level'],
+      'Quality Control': ['Front', 'Left Side', 'Right Side', 'Back', 'Open', 'Top (Optional)', 'Level 1', 'Level 2 (Optional)'],
       // Assembly now has NO photos
-      'Final QC': ['Product Level', 'Back', 'Side', 'Other Side', 'Job Card', 'Open','Spirit Level']
+      'Final QC': ['Level 1', 'Back', 'Left Side', 'Right Side', 'Job Card', 'Open', 'Top', 'Level 2 (Optional)']
     };
 
     let passModal, startModal, qcModal, alertModal, confirmModal, canvas, ctx, isDrawing = false;
@@ -510,7 +510,9 @@
       if(reqPhotos) {
         phContainer.classList.remove('d-none');
         reqPhotos.forEach((label, idx) => {
-           phInputs.innerHTML += `<div class="mb-2"><label for="photo-input-${idx}">${label}</label><input type="file" id="photo-input-${idx}" class="form-control photo-input" accept="image/*" capture="environment" data-idx="${idx}"></div>`;
+           const isOptional = label.includes('Optional');
+           const requiredAttr = isOptional ? '' : 'required';
+           phInputs.innerHTML += `<div class="mb-2"><label for="photo-input-${idx}">${label}</label><input type="file" id="photo-input-${idx}" class="form-control photo-input" accept="image/*" capture="environment" data-idx="${idx}" data-optional="${isOptional}" ${requiredAttr}></div>`;
         });
       } else {
         phContainer.classList.add('d-none');
@@ -550,16 +552,17 @@
             
             // 3. GATHER PHOTOS
             const inputs = document.querySelectorAll('.photo-input');
-            // Check if all required photos are uploaded
+            // Check if all required photos are uploaded (optional ones can be skipped)
             if(inputs.length > 0) {
-                let areAllPhotosUploaded = true;
+                let areAllRequiredPhotosUploaded = true;
                 for(let input of inputs) {
-                    if(input.files.length === 0) {
-                        areAllPhotosUploaded = false;
+                    const isOptional = input.dataset.optional === 'true';
+                    if(!isOptional && input.files.length === 0) {
+                        areAllRequiredPhotosUploaded = false;
                         break;
                     }
                 }
-                if(!areAllPhotosUploaded) { 
+                if(!areAllRequiredPhotosUploaded) { 
                     showAlert("Please upload all required photos before confirming."); 
                     return; 
                 }
@@ -573,6 +576,9 @@
                         mime: input.files[0].type,
                         data: b64.split(',')[1] 
                     });
+                } else {
+                    // Push null for optional photos that weren't uploaded
+                    fileData.push(null);
                 }
             }
           }

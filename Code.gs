@@ -412,17 +412,19 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   }
 
   // --- HELPER FUNCTION FOR IMAGES WITH HEADERS ---
-  function replaceImageTagWithHeader(tag, base64Data) {
+  function replaceImageTagWithHeader(tag, base64Data, isOptional, displayName) {
     var r = body.findText(tag);
     if (r) {
       var element = r.getElement();
       var parent = element.getParent();
       
-      // Generate a clean header name from the tag
-      // e.g., "{{Image_SpiritLevel}}" becomes "Spirit Level"
-      var headerText = tag.replace("{{Image_", "").replace("}}", "").replace("{{", "").replace("}}", "");
-      // Insert space before capital letters to separate words
-      headerText = headerText.replace(/([A-Z])/g, ' $1').trim();
+      // Use provided display name or generate from tag
+      var headerText = displayName;
+      if (!headerText) {
+        headerText = tag.replace("{{Image_", "").replace("}}", "").replace("{{", "").replace("}}", "");
+        // Insert space before capital letters to separate words
+        headerText = headerText.replace(/([A-Z])/g, ' $1').trim();
+      }
 
       if (base64Data) {
         // 1. Update the text to be the Header
@@ -437,10 +439,13 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
         
         // 3. Set Size (Large)
         img.setWidth(350).setHeight(350);
-      } else {
-        // No photo provided case
+      } else if (!isOptional) {
+        // No photo provided for required image
         element.asText().setText(headerText + ": No photo provided");
         element.asText().setBold(false);
+      } else {
+        // Optional image not provided - remove the placeholder entirely
+        parent.removeChild(element);
       }
     }
   }
@@ -469,15 +474,39 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   }
 
   // 4. Process Photos using the new Helper
-  var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
-  var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Card}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
+  // Pre-Powder Coating Template: Front, Left Side, Right Side, Back, Open, Top (optional), Level 1, Level 2 (optional)
+  var mapPre = [
+    {tag: "{{Image_Front}}", name: "Front", optional: false},
+    {tag: "{{Image_LeftSide}}", name: "Left Side", optional: false},
+    {tag: "{{Image_RightSide}}", name: "Right Side", optional: false},
+    {tag: "{{Image_Back}}", name: "Back", optional: false},
+    {tag: "{{Image_Open}}", name: "Open", optional: false},
+    {tag: "{{Image_Top}}", name: "Top", optional: true},
+    {tag: "{{Image_Level1}}", name: "Level 1", optional: false},
+    {tag: "{{Image_Level2}}", name: "Level 2", optional: true}
+  ];
+  
+  // Finished Goods Template: Level 1, Back, Left Side, Right Side, Job Card, Open, Top, Level 2 (optional)
+  var mapFin = [
+    {tag: "{{Image_Level1}}", name: "Level 1", optional: false},
+    {tag: "{{Image_Back}}", name: "Back", optional: false},
+    {tag: "{{Image_LeftSide}}", name: "Left Side", optional: false},
+    {tag: "{{Image_RightSide}}", name: "Right Side", optional: false},
+    {tag: "{{Image_Card}}", name: "Job Card", optional: false},
+    {tag: "{{Image_Open}}", name: "Open", optional: false},
+    {tag: "{{Image_Top}}", name: "Top", optional: false},
+    {tag: "{{Image_Level2}}", name: "Level 2", optional: true}
+  ];
   
   // Detect which template is being used based on tags present
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
   for (var j = 0; j < useMap.length; j++) {
-    var photoData = (photos && j < photos.length) ? photos[j].data : null;
-    replaceImageTagWithHeader(useMap[j], photoData);
+    var photoData = null;
+    if (photos && j < photos.length && photos[j] !== null) {
+      photoData = photos[j].data;
+    }
+    replaceImageTagWithHeader(useMap[j].tag, photoData, useMap[j].optional, useMap[j].name);
   }
 
   doc.saveAndClose();
