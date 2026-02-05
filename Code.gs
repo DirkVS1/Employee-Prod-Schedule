@@ -164,9 +164,45 @@ function startOrder(rowIndex, workerName, role) {
     var logSheet = getSheetOrDie(ss, TAB_LOGS);
     var overviewSheet = ss.getSheetByName(TAB_OVERVIEW);
     
+    // CHECK FOR ACTIVE ORDERS (Worker can only work on one order at a time)
+    // Exception: Delivery can have multiple in progress
+    var logData = logSheet.getDataRange().getValues();
+    var currentStatus = sheet.getRange(rowIndex, 3).getValue();
+    var nextStatus = "";
+    
+    // Determine what the next status will be to check if it's delivery
+    if (role === 'Plate Cutting') {
+      nextStatus = "plate cutting";
+    } else {
+      nextStatus = getNextStatus(currentStatus);
+      // Auto-skip "Ready" statuses
+      if (nextStatus.toLowerCase().startsWith("ready") || currentStatus.toLowerCase().startsWith("ready")) {
+        while (nextStatus.toLowerCase().startsWith("ready")) { 
+          var temp = getNextStatus(nextStatus); 
+          if (!temp) break; 
+          nextStatus = temp;
+        }
+      }
+    }
+    
+    // Check if worker already has an active order (excluding delivery)
+    var isDelivery = nextStatus.toLowerCase() === 'out for delivery';
+    if (!isDelivery) {
+      for (var i = 1; i < logData.length; i++) { // Skip header
+        var logWorker = logData[i][2]; // Column C: Worker Name
+        var logStatus = String(logData[i][4]).toLowerCase(); // Column E: Status
+        var endTime = logData[i][6]; // Column G: End Time
+        
+        // If this worker has an active order (no end time) that isn't delivery
+        if (logWorker === workerName && !endTime && logStatus !== 'out for delivery') {
+          var activeOrderNum = logData[i][1]; // Column B: Order Number
+          throw new Error("You already have an active order: " + activeOrderNum + ". Please finish it before starting a new one.");
+        }
+      }
+    }
+    
     var uniqueId = Utilities.getUuid();
     var startTime = new Date();
-    var nextStatus = "";
 
     // --- BRANCH: PLATE CUTTING (PARALLEL) ---
     if (role === 'Plate Cutting') {
@@ -176,7 +212,7 @@ function startOrder(rowIndex, workerName, role) {
       if (currentAssigned === workerName) return { success: true, message: "Already started by you." };
       if (currentAssigned !== "") throw new Error("Order locked by " + currentAssigned);
       
-      nextStatus = "plate cutting";
+      // nextStatus already set to "plate cutting" above
       sheet.getRange(rowIndex, 5).setValue(nextStatus); // Col E
       sheet.getRange(rowIndex, 6).setValue(workerName); // Col F
     } 
@@ -186,17 +222,7 @@ function startOrder(rowIndex, workerName, role) {
       if (currentAssigned === workerName) return { success: true, message: "Already started by you." };
       if (currentAssigned !== "") throw new Error("Order locked by " + currentAssigned);
       
-      var currentStatus = sheet.getRange(rowIndex, 3).getValue();
-      nextStatus = getNextStatus(currentStatus);
-      
-      // Auto-skip "Ready"
-      if (nextStatus.toLowerCase().startsWith("ready") || currentStatus.toLowerCase().startsWith("ready")) {
-          while (nextStatus.toLowerCase().startsWith("ready")) { 
-            var temp = getNextStatus(nextStatus); 
-            if (!temp) break; 
-            nextStatus = temp;
-          }
-      }
+      // nextStatus already calculated above with auto-skip logic
       sheet.getRange(rowIndex, 3).setValue(nextStatus);
       sheet.getRange(rowIndex, 4).setValue(workerName);
     }
