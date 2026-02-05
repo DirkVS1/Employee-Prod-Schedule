@@ -413,8 +413,8 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   }
 
   // 4. Photos
-  var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}", "{{Image_Open}}", "{{Image_SpriritLevel}}"];
-  var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Card}}", "{{Image_Open}}", "{{Image_SpriritLevel}}"];
+  var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
+  var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Card}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
   // First, collect ALL placeholder occurrences before any modifications
