@@ -311,6 +311,9 @@
     let hasSigned = false;
     let confirmCallback = null;
     let isSubmitting = false; 
+    
+    // Mobile breakpoint constant
+    const MOBILE_BREAKPOINT = 768;
 
     // --- QC DATA ---
     const QC_DATA = {
@@ -373,14 +376,18 @@
         qcModal = new bootstrap.Modal('#qcModal');
         alertModal = new bootstrap.Modal('#alertModal');
         confirmModal = new bootstrap.Modal('#confirmModal');
-        document.getElementById('confirmBtnYes').onclick = () => { confirmModal.hide(); if(confirmCallback) confirmCallback(); };
+        document.getElementById('confirmBtnYes').onclick = () => { if (confirmModal) confirmModal.hide(); if(confirmCallback) confirmCallback(); };
       } catch(e) {
         console.warn('Bootstrap modals not initialized:', e);
       }
       
       initSigPad();
-      initApp();
-      startLiveTimers();
+      try {
+        initApp();
+        startLiveTimers();
+      } catch(e) {
+        console.warn('App initialization error (expected in local development):', e);
+      }
     });
     
     function initMobileMenu() {
@@ -404,7 +411,7 @@
       // Close menu when navigation link is clicked
       document.querySelectorAll('.sidebar-link').forEach(link => {
         link.addEventListener('click', () => {
-          if (window.innerWidth <= 768) {
+          if (window.innerWidth <= MOBILE_BREAKPOINT) {
             closeMobileMenu();
           }
         });
@@ -414,15 +421,22 @@
       const logoutBtn = sidebar.querySelector('.sidebar-footer .btn');
       if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-          if (window.innerWidth <= 768) {
+          if (window.innerWidth <= MOBILE_BREAKPOINT) {
             closeMobileMenu();
           }
         });
       }
     }
 
-    function showAlert(msg) { document.getElementById('alertMsg').innerText = msg; alertModal.show(); }
-    function showConfirm(msg, cb) { document.getElementById('confirmMsg').innerText = msg; confirmCallback = cb; confirmModal.show(); }
+    function showAlert(msg) { 
+      document.getElementById('alertMsg').innerText = msg; 
+      if (alertModal) alertModal.show(); 
+    }
+    function showConfirm(msg, cb) { 
+      document.getElementById('confirmMsg').innerText = msg; 
+      confirmCallback = cb; 
+      if (confirmModal) confirmModal.show(); 
+    }
 
     function navTo(viewId) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.add('d-none-view'));
@@ -456,14 +470,19 @@
       appData.users.filter(u => u.role === r).forEach(u => list.innerHTML += `<button class="list-group-item list-group-item-action py-3 fw-bold" onclick="promptPass('${u.name}')">${u.name}</button>`);
       navTo('view-users');
     }
-    function promptPass(n) { session.name = n; document.getElementById('passPromptName').innerText = "Code for " + n; document.getElementById('inputPass').value=''; passModal.show(); }
+    function promptPass(n) { 
+      session.name = n; 
+      document.getElementById('passPromptName').innerText = "Code for " + n; 
+      document.getElementById('inputPass').value=''; 
+      if (passModal) passModal.show(); 
+    }
 
     function submitPass() {
       const p = document.getElementById('inputPass').value;
       google.script.run.withSuccessHandler(res => {
         if(res.success) { 
           session.isAdmin = res.isAdmin; 
-          passModal.hide(); 
+          if (passModal) passModal.hide(); 
           if(session.role === 'Admin') {
             document.getElementById('adminLinks').classList.remove('d-none-view');
             loadProductionOverview();
@@ -550,12 +569,17 @@
       }).getOrdersForRole(session.role);
     }
     
-    function preStart(row, ord) { session.pendingRow = row; session.activeOrder = ord; document.getElementById('startModalOrder').innerText = ord; startModal.show(); }
+    function preStart(row, ord) { 
+      session.pendingRow = row; 
+      session.activeOrder = ord; 
+      document.getElementById('startModalOrder').innerText = ord; 
+      if (startModal) startModal.show(); 
+    }
     
     function confirmStart() {
       if (isSubmitting) return; 
       isSubmitting = true;
-      startModal.hide();
+      if (startModal) startModal.hide();
       const card = document.getElementById(`card-${session.pendingRow}`);
       if(card) {
         card.querySelector('.status-bar').className = 'status-bar bar-running';
@@ -630,7 +654,7 @@
       }
       
       clearSignature(); 
-      qcModal.show();
+      if (qcModal) qcModal.show();
     }
 
     async function submitQC(skip=false) {
@@ -699,7 +723,7 @@
           
           // 4. UI FEEDBACK: SHOW LOADING STATE
           isSubmitting = true;
-          qcModal.hide();
+          if (qcModal) qcModal.hide();
           
           if(card) {
              const btn = card.querySelector('button');
