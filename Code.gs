@@ -407,9 +407,9 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
     for (var s = 0; s < sigOccurrences.length; s++) {
       var occ = sigOccurrences[s];
       var imgBlob = Utilities.newBlob(Utilities.base64Decode(sigData), 'image/png');
-      // Signature stays small
+      // Set header text and insert signature
+      occ.element.asText().setText("Signature:\n");
       occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob).setWidth(200).setHeight(100);
-      occ.element.removeFromParent();
     }
   }
 
