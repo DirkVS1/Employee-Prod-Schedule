@@ -501,6 +501,8 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   // Detect which template is being used based on tags present
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
+  // Note: The photos array includes null entries for skipped optional photos
+  // The array length matches the number of photo inputs, with null representing skipped optional photos
   for (var j = 0; j < useMap.length; j++) {
     var photoData = null;
     if (photos && j < photos.length && photos[j] !== null) {

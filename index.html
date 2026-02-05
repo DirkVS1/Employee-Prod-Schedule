@@ -568,6 +568,8 @@
                 }
             }
             
+            // Build photos array: include actual photo data or null for skipped optional photos
+            // This ensures array indices match the expected photo positions in the template
             for(let input of inputs) {
                 if(input.files.length > 0) {
                     let b64 = await toBase64(input.files[0]);
@@ -577,7 +579,8 @@
                         data: b64.split(',')[1] 
                     });
                 } else {
-                    // Push null for optional photos that weren't uploaded
+                    // Only optional photos should reach here due to validation above
+                    // Push null to maintain correct array indexing
                     fileData.push(null);
                 }
             }
