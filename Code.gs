@@ -352,17 +352,13 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
 
 function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, photos) {
   var folder = getFolder();
-  
-  // Get the template file and ensure we're accessing the latest version
-  // by opening and immediately closing it before copying
   var templateFile = DriveApp.getFileById(templateId);
   
   // Force a refresh by opening the document first
   try {
     var tempDoc = DocumentApp.openById(templateId);
-    tempDoc.saveAndClose(); // This ensures we get the latest saved version
+    tempDoc.saveAndClose();
   } catch(e) {
-    // If opening fails, just log and continue with the copy
     Logger.log("Could not open template for refresh: " + e.toString());
   }
   
@@ -375,10 +371,14 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   body.replaceText("{{Timestamp}}", new Date().toLocaleString());
   body.replaceText("{{OrderNumber}}", orderNum);
 
-  // 2. Answer Replacements
+  // 2. Answer Replacements (FIX: Convert Y/N to Yes/No)
   if (qcAnswers) {
     for (var i = 0; i < qcAnswers.length; i++) {
-      body.replaceText("{{Q" + (i+1) + "}}", qcAnswers[i].a);
+      var ans = qcAnswers[i].a;
+      if (ans === "Y") ans = "Yes";
+      else if (ans === "N") ans = "No";
+      
+      body.replaceText("{{Q" + (i+1) + "}}", ans);
     }
   }
 
@@ -407,14 +407,17 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
     for (var s = 0; s < sigOccurrences.length; s++) {
       var occ = sigOccurrences[s];
       var imgBlob = Utilities.newBlob(Utilities.base64Decode(sigData), 'image/png');
-      occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob).setWidth(200).setHeight(200);
+      // Signature stays small
+      occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob).setWidth(200).setHeight(100);
       occ.element.removeFromParent();
     }
   }
 
   // 4. Photos
+  // Updated list including new tags
   var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
   var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Card}}", "{{Image_Open}}", "{{Image_SpiritLevel}}"];
+  
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
   // First, collect ALL placeholder occurrences before any modifications
@@ -435,14 +438,26 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
     
     for (var m = 0; m < occurrences.length; m++) {
       var occ = occurrences[m];
+      
       if (photoData) {
+        // FIX: Create a clean header name (e.g., "{{Image_Front}}" becomes "Front:")
+        var cleanHeader = photoInfo.tag.replace("{{Image_", "").replace("}}", "").replace(/_/g, " ") + ":";
+        
+        // Update the text to be the Header + Newline (prevents removing it)
+        occ.element.asText().setText(cleanHeader + "\n");
+        
         // Insert image
         var imgBlob = Utilities.newBlob(Utilities.base64Decode(photoData), 'image/png');
-        occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob).setWidth(200).setHeight(200);
-        occ.element.removeFromParent();
+        var img = occ.parent.insertInlineImage(occ.childIndex + 1, imgBlob);
+        
+        // FIX: Make image larger and allow height to scale automatically
+        img.setWidth(450); 
+        // We do NOT setHeight here, so it keeps the correct aspect ratio
+        
       } else {
         // Replace with "No photo provided" text
-        occ.element.asText().setText(photoInfo.tag.replace(/\{\{|\}\}/g, '') + ": No photo provided");
+        var cleanHeader = photoInfo.tag.replace("{{Image_", "").replace("}}", "").replace(/_/g, " ");
+        occ.element.asText().setText(cleanHeader + ": No photo provided\n");
       }
     }
   }
@@ -470,7 +485,6 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
       Logger.log("Email failed: " + e.toString());
     }
   }
-  // ---------------------
   
   return pdfFile.getUrl();
 }
