@@ -46,6 +46,75 @@
     .live-timer { font-variant-numeric: tabular-nums; }
     @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-card { animation: slideIn 0.3s ease-out forwards; }
+    
+    /* Responsive Mobile Styles */
+    @media (max-width: 768px) {
+      /* Adjust container padding for mobile */
+      .container-fluid { padding-left: 10px !important; padding-right: 10px !important; }
+      
+      /* Smaller headings on mobile */
+      h1.display-4 { font-size: 2rem; }
+      h2 { font-size: 1.5rem; }
+      h3 { font-size: 1.25rem; }
+      h4 { font-size: 1.1rem; }
+      
+      /* Sidebar adjustments for mobile */
+      .sidebar { width: 280px; max-width: 85vw; }
+      .sidebar-link { padding: 12px 20px; font-size: 0.95rem; }
+      
+      /* Menu toggle button larger for easier touch */
+      .menu-toggle { padding: 12px; top: 10px; left: 10px; }
+      .menu-toggle i { font-size: 1.5rem; }
+      
+      /* Cards stack better on mobile */
+      .card { margin-bottom: 1rem; }
+      .card-body { padding: 1rem; }
+      
+      /* Buttons should be easier to tap */
+      .btn { padding: 0.75rem 1rem; font-size: 0.95rem; min-height: 44px; }
+      .btn-sm { min-height: 36px; }
+      
+      /* Navigation pills stack vertically on small screens */
+      .nav-pills { flex-direction: column; }
+      .nav-pills .nav-link { margin-bottom: 0.5rem; text-align: center; }
+      
+      /* Form inputs larger for mobile */
+      .form-control { font-size: 16px; padding: 0.75rem; min-height: 44px; }
+      
+      /* Modal adjustments */
+      .modal-dialog { margin: 0.5rem; }
+      .modal-content { padding: 0.5rem; }
+      
+      /* Tables responsive */
+      .table { font-size: 0.85rem; }
+      
+      /* Signature canvas smaller on mobile */
+      #sigCanvas { height: 150px; }
+      
+      /* Photo inputs */
+      .photo-input { font-size: 14px; }
+      
+      /* Admin tabs should wrap better */
+      #adminProdTabs { flex-wrap: wrap; }
+      #adminProdTabs .nav-link { font-size: 0.85rem; padding: 0.5rem; }
+    }
+    
+    /* Tablet and larger mobile landscape */
+    @media (min-width: 576px) and (max-width: 991px) {
+      .container { max-width: 100%; padding: 0 15px; }
+      h1.display-4 { font-size: 2.5rem; }
+    }
+    
+    /* Improve accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      .sidebar, .animate-card { animation: none; transition: none; }
+    }
+    
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+      .card { border: 2px solid var(--sd-accent); }
+      .btn { border-width: 2px; }
+    }
   </style>
 </head>
 <body>
@@ -241,7 +310,7 @@
     function renderRoles() {
       const grid = document.getElementById('roleGrid'); grid.innerHTML = '';
       [...new Set(appData.users.map(u => u.role))].sort().forEach(r => {
-        grid.innerHTML += `<div class="col-md-4"><div class="card p-4 text-center h-100 role-card" onclick="selectRole('${r}')"><h4>${r}</h4></div></div>`;
+        grid.innerHTML += `<div class="col-sm-6 col-md-4 col-lg-3"><div class="card p-4 text-center h-100 role-card" onclick="selectRole('${r}')"><h4>${r}</h4></div></div>`;
       });
     }
 
@@ -475,14 +544,24 @@
           if(card) {
              const btn = card.querySelector('button');
              if(btn) {
+                 // Determine if PDF will be generated
+                 // PDFs are only generated for Quality Control or Final QC roles with QC data and signature
+                 const statusText = card.querySelector('.badge.bg-dark')?.innerText.toLowerCase().trim() || "";
+                 const willGeneratePdf = !skip && 
+                                       (session.role === 'Quality Control' || statusText === 'final qc') && 
+                                       statusText !== 'powder coating' &&
+                                       d.length > 0 && 
+                                       sig;
+                 
                  // Change button text and add spinner
-                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>GENERATING PDF...';
+                 const loadingText = willGeneratePdf ? 'GENERATING PDF...' : 'FINISHING...';
+                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + loadingText;
                  // Make it look grey/disabled
                  btn.classList.remove('btn-success', 'btn-primary');
                  btn.classList.add('btn-secondary');
                  btn.disabled = true;
              }
-             // Ensure opacity is full so you can read the "Generating PDF" text
+             // Ensure opacity is full so you can read the loading text
              card.style.opacity = '1';
           }
           
