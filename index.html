@@ -62,10 +62,58 @@
     @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-card { animation: slideIn 0.3s ease-out forwards; }
     
+    /* Mobile Menu Button */
+    .mobile-menu-btn {
+      position: fixed;
+      top: 15px;
+      left: 15px;
+      z-index: 1100;
+      width: 44px;
+      height: 44px;
+      background: white;
+      border: 2px solid #000;
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transition: all 0.2s ease;
+    }
+    .mobile-menu-btn:hover {
+      background: #f8f9fa;
+      transform: scale(1.05);
+    }
+    .mobile-menu-btn i {
+      font-size: 1.5rem;
+      color: #000;
+    }
+    
+    /* Mobile backdrop overlay */
+    .mobile-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .mobile-backdrop.show {
+      opacity: 1;
+    }
+    
     /* Responsive Mobile Styles */
     @media (max-width: 768px) {
+      /* Show mobile menu button */
+      .mobile-menu-btn { display: flex; }
+      .mobile-backdrop { display: block; }
+      
       /* Adjust container padding for mobile */
-      .container-fluid { padding-left: 10px !important; padding-right: 10px !important; }
+      .container-fluid { padding-left: 10px !important; padding-right: 10px !important; padding-top: 70px !important; }
       
       /* Smaller headings on mobile */
       h1.display-4 { font-size: 2rem; }
@@ -73,14 +121,22 @@
       h3 { font-size: 1.25rem; }
       h4 { font-size: 1.1rem; }
       
-      /* Sidebar adjustments for mobile */
-      .sidebar { width: var(--sidebar-width-mobile); }
-      .sidebar-link { padding: 12px 8px; font-size: 0.85rem; }
-      .sidebar-link i { font-size: 1.5rem; margin-bottom: 6px; }
-      .sidebar-link .link-text { font-size: 0.7rem; }
+      /* Sidebar as overlay drawer on mobile */
+      .sidebar { 
+        width: 280px;
+        left: -280px;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.3);
+      }
+      .sidebar.mobile-open {
+        left: 0;
+      }
+      .sidebar-link { padding: 15px 12px; font-size: 0.9rem; }
+      .sidebar-link i { font-size: 1.8rem; margin-bottom: 8px; }
+      .sidebar-link .link-text { font-size: 0.85rem; }
       
-      /* Main content adjustment for mobile */
-      .main-content { margin-left: var(--sidebar-width-mobile); }
+      /* Main content uses full width on mobile */
+      .main-content { margin-left: 0; }
       
       /* Cards stack better on mobile */
       .card { margin-bottom: 1rem; }
@@ -139,6 +195,14 @@
     <h2 class="brand-font mb-3">STUDIO DELTA</h2>
     <div class="spinner-border text-dark"></div>
   </div>
+
+  <!-- Mobile Menu Button -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+    <i class="bi bi-list"></i>
+  </button>
+
+  <!-- Mobile Backdrop -->
+  <div class="mobile-backdrop" id="mobileBackdrop"></div>
 
   <nav class="sidebar" id="sidebar" aria-label="Main navigation">
     <div class="sidebar-header">
@@ -299,16 +363,63 @@
     let passModal, startModal, qcModal, alertModal, confirmModal, canvas, ctx, isDrawing = false;
 
     document.addEventListener('DOMContentLoaded', () => {
-      passModal = new bootstrap.Modal('#passModal');
-      startModal = new bootstrap.Modal('#startModal');
-      qcModal = new bootstrap.Modal('#qcModal');
-      alertModal = new bootstrap.Modal('#alertModal');
-      confirmModal = new bootstrap.Modal('#confirmModal');
+      // Initialize mobile menu first (doesn't depend on Bootstrap)
+      initMobileMenu();
+      
+      // Initialize Bootstrap modals (wrapped in try-catch in case Bootstrap doesn't load)
+      try {
+        passModal = new bootstrap.Modal('#passModal');
+        startModal = new bootstrap.Modal('#startModal');
+        qcModal = new bootstrap.Modal('#qcModal');
+        alertModal = new bootstrap.Modal('#alertModal');
+        confirmModal = new bootstrap.Modal('#confirmModal');
+        document.getElementById('confirmBtnYes').onclick = () => { confirmModal.hide(); if(confirmCallback) confirmCallback(); };
+      } catch(e) {
+        console.warn('Bootstrap modals not initialized:', e);
+      }
+      
       initSigPad();
       initApp();
       startLiveTimers();
-      document.getElementById('confirmBtnYes').onclick = () => { confirmModal.hide(); if(confirmCallback) confirmCallback(); };
     });
+    
+    function initMobileMenu() {
+      const sidebar = document.getElementById('sidebar');
+      const menuBtn = document.getElementById('mobileMenuBtn');
+      const backdrop = document.getElementById('mobileBackdrop');
+      
+      function toggleMobileMenu() {
+        sidebar.classList.toggle('mobile-open');
+        backdrop.classList.toggle('show');
+      }
+      
+      function closeMobileMenu() {
+        sidebar.classList.remove('mobile-open');
+        backdrop.classList.remove('show');
+      }
+      
+      menuBtn.addEventListener('click', toggleMobileMenu);
+      backdrop.addEventListener('click', closeMobileMenu);
+      
+      // Close menu when navigation link is clicked
+      document.querySelectorAll('.sidebar-link').forEach(link => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth <= 768) {
+            closeMobileMenu();
+          }
+        });
+      });
+      
+      // Close menu when logout is clicked
+      const logoutBtn = sidebar.querySelector('.sidebar-footer .btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          if (window.innerWidth <= 768) {
+            closeMobileMenu();
+          }
+        });
+      }
+    }
 
     function showAlert(msg) { document.getElementById('alertMsg').innerText = msg; alertModal.show(); }
     function showConfirm(msg, cb) { document.getElementById('confirmMsg').innerText = msg; confirmCallback = cb; confirmModal.show(); }
