@@ -9,6 +9,7 @@ var FOLDER_NAME = "Studio_Delta_QC_Records"; // Folder created in Drive for PDFs
 // *** CRITICAL: PASTE YOUR TEMPLATE IDs HERE ***
 var TEMP_ID_PRE_POWDER = "18gdKTtaJFqG7EALy-OofLoBxcJ873U4sUTUks3_2oEo";
 var TEMP_ID_FINISHED   = "1WXW4F_PIjcA5v2ZSqJDptQrKtlikiVuqOeUy706rV7I";
+var QC_EMAIL_RECIPIENT = "dirk.visser1805@gmail.com"; // <--- CHANGE THIS TO YOUR EMAIL
 
 function doGet() {
   return HtmlService.createTemplateFromFile('index')
@@ -349,7 +350,6 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
   }
 }
 
-// --- PDF GENERATOR HELPER ---
 function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, photos) {
   var folder = getFolder();
   var templateFile = DriveApp.getFileById(templateId);
@@ -369,7 +369,7 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
     }
   }
 
-  // Helper to insert image at placeholder or replace with default text
+  // Helper to insert image
   function replaceImageTag(tag, base64Data) {
     var r = body.findText(tag);
     if (r) {
@@ -391,15 +391,11 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   // 3. Signature
   if (sigBase64) replaceImageTag("{{Signature}}", sigBase64.split(',')[1]);
 
-  // 4. Photos (Mapped by position in array)
-  // Maps match the tags in your Google Doc Templates
-  var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}"];
-  var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Card}}"];
-  
-  // Detect which map to use based on finding a tag in the doc
+  // 4. Photos
+  var mapPre = ["{{Image_Front}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Back}}", "{{Image_Open}}", "{{Image_SpriritLevel}}"];
+  var mapFin = ["{{Image_Level}}", "{{Image_Back}}", "{{Image_Side}}", "{{Image_Side2}}", "{{Image_Card}}", "{{Image_Open}}", "{{Image_SpriritLevel}}"];
   var useMap = body.findText("{{Image_Front}}") ? mapPre : mapFin;
 
-  // Process each photo slot
   for (var j = 0; j < useMap.length; j++) {
     var photoData = (photos && j < photos.length) ? photos[j].data : null;
     replaceImageTag(useMap[j], photoData);
@@ -413,6 +409,22 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
   
   // Trash the temp doc
   newFile.setTrashed(true);
+
+  // --- EMAIL SECTION ---
+  if (QC_EMAIL_RECIPIENT && QC_EMAIL_RECIPIENT !== "") {
+    try {
+      MailApp.sendEmail({
+        to: QC_EMAIL_RECIPIENT,
+        subject: "QC Report: " + orderNum + " (" + workerName + ")",
+        htmlBody: "<p>Please find the attached QC report for Order <strong>" + orderNum + "</strong>.</p>" +
+                  "<p>Completed by: " + workerName + "<br>Date: " + new Date().toLocaleString() + "</p>",
+        attachments: [pdfBlob]
+      });
+    } catch (e) {
+      Logger.log("Email failed: " + e.toString());
+    }
+  }
+  // ---------------------
   
   return pdfFile.getUrl();
 }
