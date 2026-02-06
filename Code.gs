@@ -169,8 +169,8 @@ function getOrdersForRole(role) {
   };
 
   // PLATE CUTTING IS SPECIAL (Independent)
-  // It can happen anytime from start until Grinding begins
-  var plateCuttingEligible = ['Not Yet Started', 'Ready for Steelwork', 'Profile Cutting', 'Ready for Tagging', 'Tagging', 'Ready for Welding', 'Welding'];
+  // It can happen anytime from start until grinding actually begins (i.e., up through welding completion)
+  var plateCuttingEligible = ['Not Yet Started', 'Ready for Steelwork', 'Profile Cutting', 'Ready for Tagging', 'Tagging', 'Ready for Welding', 'Welding', 'Ready for Grinding'];
 
   // Start loop at 1 to skip header
   for (var i = 1; i < data.length; i++) {
