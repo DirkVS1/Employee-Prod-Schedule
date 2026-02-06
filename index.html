@@ -324,11 +324,38 @@
 
     // --- QC DATA ---
     const QC_DATA = {
-      'Profile Cutting': ["Dims match Job Card?", "All items cut?", "Angles cut correctly?", "Edges Clean?"],
-      'Plate Cutting': ["Dimensions match?", "Plate thickness correct?", "Edges clean/deburred?", "Scrap minimized?"],
-      'Tagging': ["Drawing matches desc?", "Mistakes corrected?", "Measurements match?", "Frame square?", "Glass fits?"],
-      'Welding': ["Tag spots welded?", "Plates welded flush?", "No dents/scratches?", "Frame still square?", "Glass fits?"],
-      'Grinding': ["Welds ground flush?", "No deep scratches?", "Surface smooth?", "Ready for coating?"],
+      'Profile Cutting': [
+        "Do the dimensions match the Job Card?", 
+        "Have all items been cut?", 
+        "Are all angles cut correctly?", 
+        "Are the edges clean and deburred?"
+      ],
+      'Plate Cutting': [
+        "Do the dimensions match the specifications?", 
+        "Is the plate thickness correct?", 
+        "Are the edges clean and deburred?", 
+        "Has scrap been minimized?"
+      ],
+      'Tagging': [
+        "Does the drawing match the description?", 
+        "Have all mistakes been corrected?", 
+        "Do the measurements match?", 
+        "Is the frame square?", 
+        "Does the glass fit properly?"
+      ],
+      'Welding': [
+        "Have all tag spots been welded?", 
+        "Are all plates welded flush?", 
+        "Is the unit free from dents and scratches?", 
+        "Is the frame still square?", 
+        "Does the glass still fit properly?"
+      ],
+      'Grinding': [
+        "Have all welds been ground flush?", 
+        "Is the surface free from deep scratches?", 
+        "Is the surface smooth?", 
+        "Is the unit ready for powder coating?"
+      ],
       
       // PRE-POWDER (Standard QC Role)
       'Quality Control': ["Does the unit match the description of the Job Card?", "If there is a drawing, does the unit match the drawing?", "Is the frame square?", "Will the glass fit?", "Are the overall dimensions correct?", "Are all the required welding spots welded?", "Have all welding spots been grinded and polished?", "Does the hinges have enough clearance for the doors to open properly?", "Are the welds on the bullet hinges adequately strong?", "Are the plates free from dents, holes and weld marks?", "Are weld areas free from spatter and holes?", "Is the overall grinding of the unit uniform and smooth?", "Have powder coating stickers been placed on the unit?", "Do the stickers colour match the colour of the job card?"],
@@ -661,6 +688,7 @@
       }
       
       clearSignature(); 
+      initCanvas(); // Ensure canvas is properly sized when modal opens
       if (qcModal) qcModal.show();
     }
 
@@ -975,19 +1003,81 @@
 
     function initSigPad() {
       canvas = document.getElementById('sigCanvas'); 
-      // Set canvas resolution to match its display size
+      ctx = canvas.getContext('2d');
+      
+      // Mouse events
+      canvas.addEventListener('mousedown', sD); 
+      canvas.addEventListener('mousemove', dD); 
+      canvas.addEventListener('mouseup', () => isDrawing=false);
+      canvas.addEventListener('mouseleave', () => isDrawing=false);
+      
+      // Touch events - handle differently to ensure proper coordinates
+      canvas.addEventListener('touchstart', handleTouchStart, {passive: false}); 
+      canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+      canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
+    }
+    
+    // Initialize/reset canvas dimensions
+    function initCanvas() {
+      if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
+      // Save current drawing if exists
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Set canvas resolution to match its display size
       canvas.width = rect.width;
       canvas.height = rect.height;
-      ctx = canvas.getContext('2d');
-      ctx.lineWidth=2; 
-      canvas.addEventListener('mousedown', sD); canvas.addEventListener('mousemove', dD); canvas.addEventListener('mouseup', () => isDrawing=false);
-      canvas.addEventListener('touchstart', e=>{e.preventDefault();sD(e.touches[0])}); canvas.addEventListener('touchmove', e=>{e.preventDefault();dD(e.touches[0])});
-      canvas.addEventListener('touchend', () => isDrawing=false);
+      // Restore drawing
+      ctx.putImageData(imgData, 0, 0);
+      // Set drawing properties
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#000';
     }
-    function sD(e) { isDrawing=true; hasSigned=true; const r=canvas.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(e.clientX-r.left, e.clientY-r.top); }
-    function dD(e) { if(!isDrawing)return; const r=canvas.getBoundingClientRect(); ctx.lineTo(e.clientX-r.left, e.clientY-r.top); ctx.stroke(); }
-    function clearSignature() { hasSigned=false; ctx.clearRect(0,0,canvas.width,canvas.height); }
+    
+    function handleTouchStart(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      isDrawing = true;
+      hasSigned = true;
+      ctx.beginPath();
+      ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+    }
+    
+    function handleTouchMove(e) {
+      e.preventDefault();
+      if (!isDrawing) return;
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+      ctx.stroke();
+    }
+    
+    function handleTouchEnd(e) {
+      e.preventDefault();
+      isDrawing = false;
+    }
+    
+    function sD(e) { 
+      isDrawing=true; 
+      hasSigned=true; 
+      const r=canvas.getBoundingClientRect(); 
+      ctx.beginPath(); 
+      ctx.moveTo(e.clientX-r.left, e.clientY-r.top); 
+    }
+    
+    function dD(e) { 
+      if(!isDrawing)return; 
+      const r=canvas.getBoundingClientRect(); 
+      ctx.lineTo(e.clientX-r.left, e.clientY-r.top); 
+      ctx.stroke(); 
+    }
+    
+    function clearSignature() { 
+      hasSigned=false; 
+      ctx.clearRect(0,0,canvas.width,canvas.height); 
+    }
   </script>
 </body>
 </html>
