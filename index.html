@@ -812,7 +812,7 @@
             })
             .withFailureHandler((error) => {
               isSubmitting = false;
-              showAlert("System Error: " + error);
+              showAlert("Error: " + error);
               // Reset button if error
               if(card) {
                   const btn = card.querySelector('button');
@@ -830,7 +830,7 @@
       } catch (err) {
           isSubmitting = false;
           console.error(err);
-          showAlert("Client Error: " + err.message);
+          showAlert("Error: " + err.message);
           // Reset button if client error (like photo issue)
           if(card) {
               const btn = card.querySelector('button');
