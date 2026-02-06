@@ -1011,16 +1011,28 @@
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#000';
       
-      // Mouse events
-      canvas.addEventListener('mousedown', sD); 
-      canvas.addEventListener('mousemove', dD); 
-      canvas.addEventListener('mouseup', () => isDrawing=false);
-      canvas.addEventListener('mouseleave', () => isDrawing=false);
-      
-      // Touch events - handle differently to ensure proper coordinates
-      canvas.addEventListener('touchstart', handleTouchStart, {passive: false}); 
-      canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
-      canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
+      // Check if browser supports pointer events (modern approach - works for mouse, touch, and stylus)
+      if (window.PointerEvent) {
+        // Pointer events - unified API for all input types (mouse, touch, stylus)
+        canvas.addEventListener('pointerdown', handlePointerDown);
+        canvas.addEventListener('pointermove', handlePointerMove);
+        canvas.addEventListener('pointerup', handlePointerEnd);
+        canvas.addEventListener('pointercancel', handlePointerEnd);
+        canvas.addEventListener('pointerleave', handlePointerEnd);
+      } else {
+        // Fallback to traditional mouse/touch events for older browsers
+        // Mouse events
+        canvas.addEventListener('mousedown', sD); 
+        canvas.addEventListener('mousemove', dD); 
+        canvas.addEventListener('mouseup', () => isDrawing=false);
+        canvas.addEventListener('mouseleave', () => isDrawing=false);
+        
+        // Touch events - handle differently to ensure proper coordinates
+        canvas.addEventListener('touchstart', handleTouchStart, {passive: false}); 
+        canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+        canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
+        canvas.addEventListener('touchcancel', handleTouchEnd, {passive: false});
+      }
     }
     
     // Initialize/reset canvas dimensions
@@ -1032,6 +1044,9 @@
       
       const rect = canvas.getBoundingClientRect();
       
+      // Handle high DPI displays (Retina, etc.)
+      const dpr = window.devicePixelRatio || 1;
+      
       // Save current drawing if canvas already has valid dimensions
       let imgData = null;
       if (canvas.width > 0 && canvas.height > 0) {
@@ -1042,9 +1057,12 @@
         }
       }
       
-      // Set canvas resolution to match its display size
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      // Set canvas resolution to match its display size, accounting for device pixel ratio
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      
+      // Scale the context to account for device pixel ratio
+      ctx.scale(dpr, dpr);
       
       // Restore drawing if it existed
       if (imgData) {
@@ -1062,8 +1080,33 @@
       ctx.strokeStyle = '#000';
     }
     
+    // Unified pointer event handlers (works for mouse, touch, stylus, pen)
+    function handlePointerDown(e) {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      isDrawing = true;
+      hasSigned = true;
+      ctx.beginPath();
+      ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
+    
+    function handlePointerMove(e) {
+      e.preventDefault();
+      if (!isDrawing) return;
+      const rect = canvas.getBoundingClientRect();
+      ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+      ctx.stroke();
+    }
+    
+    function handlePointerEnd(e) {
+      e.preventDefault();
+      isDrawing = false;
+    }
+    
     function handleTouchStart(e) {
       e.preventDefault();
+      // Only handle single touch (ignore multi-touch)
+      if (e.touches.length > 1) return;
       const touch = e.touches[0];
       const rect = canvas.getBoundingClientRect();
       isDrawing = true;
@@ -1075,6 +1118,11 @@
     function handleTouchMove(e) {
       e.preventDefault();
       if (!isDrawing) return;
+      // Only handle single touch (ignore multi-touch)
+      if (e.touches.length > 1) {
+        isDrawing = false;
+        return;
+      }
       const touch = e.touches[0];
       const rect = canvas.getBoundingClientRect();
       ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
