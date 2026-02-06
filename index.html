@@ -358,7 +358,7 @@
       ],
       
       // PRE-POWDER (Standard QC Role)
-      'Quality Control': ["Does the unit match the description of the Job Card?", "If there is a drawing, does the unit match the drawing?", "Is the frame square?", "Will the glass fit?", "Are the overall dimensions correct?", "Are all the required welding spots welded?", "Have all welding spots been grinded and polished?", "Does the hinges have enough clearance for the doors to open properly?", "Are the welds on the bullet hinges adequately strong?", "Are the plates free from dents, holes and weld marks?", "Are weld areas free from spatter and holes?", "Is the overall grinding of the unit uniform and smooth?", "Have powder coating stickers been placed on the unit?", "Do the stickers colour match the colour of the job card?"],
+      'Quality Control': ["Does the unit match the description of the Job Card?", "If there is a drawing, does the unit match the drawing?", "Is the frame square?", "Will the glass fit?", "Are the overall dimensions correct?", "Are all the required welding spots welded?", "Have all welding spots been grinded and polished?", "Does the hinges have enough clearance for the doors to open properly?", "Are the welds on the bullet hinges adequately strong?", "Are the plates free from dents, holes and weld marks?", "Are weld areas free from spatter and holes?", "Is the overall grinding of the unit uniform and smooth?", "Have powder coating stickers been placed on the unit?", "Do the stickers colour match the colour of the Job Card?"],
       
       // NEW: POST ASSEMBLE CHECKLIST (From your image - No Photos/PDF)
       'Assembly': [
@@ -375,18 +375,18 @@
 
       // NEW: FINAL QC (Old Assembly Checklist - Generates PDF)
       'Final QC': [
-        "Paint free of scratches?", 
+        "Is the paint free of scratches?", 
         "Have the edges of the backboard been smoothed out?", 
-        "No lines visible on back board paint?", 
-        "Glass free of scratches?", 
-        "All screws flush and level?", 
-        "Glass clips straight and level with one another?", 
-        "All doors straight and level?", 
-        "Doors opening easily?", 
-        "Magnets straight and level?", 
-        "End caps fitted?", 
-        "Glass shelves checked and fitted?", 
-        "Product Level?"
+        "Is the back board paint free of lines?", 
+        "Is the glass free of scratches?", 
+        "Are all screws flush and level?", 
+        "Are the glass clips straight and level with one another?", 
+        "Are all doors straight and level?", 
+        "Are the doors opening easily?", 
+        "Are the magnets straight and level?", 
+        "Are the end caps fitted?", 
+        "Have the glass shelves been checked and fitted?", 
+        "Is the product level?"
       ]
     };
 
@@ -812,7 +812,7 @@
             })
             .withFailureHandler((error) => {
               isSubmitting = false;
-              showAlert("System Error: " + error);
+              showAlert("Error: " + error);
               // Reset button if error
               if(card) {
                   const btn = card.querySelector('button');
@@ -830,7 +830,7 @@
       } catch (err) {
           isSubmitting = false;
           console.error(err);
-          showAlert("Client Error: " + err.message);
+          showAlert("Error: " + err.message);
           // Reset button if client error (like photo issue)
           if(card) {
               const btn = card.querySelector('button');

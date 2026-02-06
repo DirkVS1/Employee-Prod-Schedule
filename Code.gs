@@ -96,41 +96,41 @@ function getOrdersForRole(role) {
   
   // MAIN FLOW VISIBILITY
   var mainVisibilityMap = {
-    'Profile Cutting': ['not yet started', 'ready for steelwork', 'profile cutting'],
-    'Tagging': ['ready for tagging', 'tagging'],
-    'Welding': ['ready for welding', 'welding'],
-    'Grinding': ['ready for grinding', 'grinding'],
+    'Profile Cutting': ['Not Yet Started', 'Ready for Steelwork', 'Profile Cutting'],
+    'Tagging': ['Ready for Tagging', 'Tagging'],
+    'Welding': ['Ready for Welding', 'Welding'],
+    'Grinding': ['Ready for Grinding', 'Grinding'],
     'Quality Control': [
-      'ready for pre-powder coating', 'pre-powder coating', 
-      'ready for powder coating', 'powder coating', 
-      'ready for final qc', 'final qc',
-      'ready for delivery', 'out for delivery'
+      'Ready for Pre-Powder Coating', 'Pre-Powder Coating', 
+      'Ready for Powder Coating', 'Powder Coating', 
+      'Ready for Final QC', 'Final QC',
+      'Ready for Delivery', 'Out for Delivery'
     ],
-    'Assembly': ['ready for assembly', 'assembly']
+    'Assembly': ['Ready for Assembly', 'Assembly']
   };
 
   // PLATE CUTTING IS SPECIAL (Independent)
   // It can happen anytime from start until Grinding begins
-  var plateCuttingEligible = ['not yet started', 'ready for steelwork', 'profile cutting', 'ready for tagging', 'tagging', 'ready for welding', 'welding'];
+  var plateCuttingEligible = ['Not Yet Started', 'Ready for Steelwork', 'Profile Cutting', 'Ready for Tagging', 'Tagging', 'Ready for Welding', 'Welding'];
 
   // Start loop at 1 to skip header
   for (var i = 1; i < data.length; i++) {
     var orderNum = data[i][1];
-    var mainStatus = String(data[i][2]).toLowerCase().trim();
+    var mainStatus = String(data[i][2]).trim();
     
     // 1. HANDLE PLATE CUTTING (Parallel Process)
     if (role === 'Plate Cutting') {
       // Check if main status allows it AND it hasn't been finished yet
       // We use Column E (index 4) for Plate Status and F (index 5) for Plate Assigned
-      var plateStatus = data[i][4] ? String(data[i][4]).toLowerCase() : "";
+      var plateStatus = data[i][4] ? String(data[i][4]).trim() : "";
       var plateAssigned = data[i][5];
 
       // Show if order is in eligible phase AND plate cutting isn't finished
-      if (plateCuttingEligible.includes(mainStatus) && plateStatus !== 'finished') {
+      if (plateCuttingEligible.includes(mainStatus) && plateStatus !== 'Finished') {
         relevantOrders.push({
           rowIndex: i + 1,
           order: orderNum,
-          status: plateStatus === 'plate cutting' ? 'In Progress' : 'Available', // Display status
+          status: plateStatus === 'Plate Cutting' ? 'In Progress' : 'Available', // Display status
           assigned: plateAssigned,
           isPlateOrder: true // Flag for frontend logic
         });
@@ -170,12 +170,12 @@ function startOrder(rowIndex, workerName, role) {
     
     // Determine what the next status will be to check if it's delivery
     if (role === 'Plate Cutting') {
-      nextStatus = "plate cutting";
+      nextStatus = "Plate Cutting";
     } else {
       nextStatus = getNextStatus(currentStatus);
       // Auto-skip "Ready" statuses
-      if (nextStatus && nextStatus.toLowerCase().startsWith("ready") || currentStatus && currentStatus.toLowerCase().startsWith("ready")) {
-        while (nextStatus && nextStatus.toLowerCase().startsWith("ready")) { 
+      if (nextStatus && nextStatus.startsWith("Ready") || currentStatus && currentStatus.startsWith("Ready")) {
+        while (nextStatus && nextStatus.startsWith("Ready")) { 
           var temp = getNextStatus(nextStatus); 
           if (!temp) break; 
           nextStatus = temp;
@@ -185,16 +185,16 @@ function startOrder(rowIndex, workerName, role) {
     
     // CHECK FOR ACTIVE ORDERS (Worker can only work on one order at a time)
     // Exception: Delivery can have multiple in progress
-    var isDelivery = nextStatus && nextStatus.toLowerCase() === 'out for delivery';
+    var isDelivery = nextStatus && nextStatus === 'Out for Delivery';
     if (!isDelivery) {
       var logData = logSheet.getDataRange().getValues();
       for (var i = 1; i < logData.length; i++) { // Skip header
         var logWorker = logData[i][2]; // Column C: Worker Name
-        var logStatus = logData[i][4] ? String(logData[i][4]).toLowerCase() : ""; // Column E: Status
+        var logStatus = logData[i][4] ? String(logData[i][4]) : ""; // Column E: Status
         var endTime = logData[i][6]; // Column G: End Time
         
         // If this worker has an active order (no end time) that isn't delivery
-        if (logWorker === workerName && !endTime && logStatus && logStatus !== 'out for delivery') {
+        if (logWorker === workerName && !endTime && logStatus && logStatus !== 'Out for Delivery') {
           var activeOrderNum = logData[i][1]; // Column B: Order Number
           throw new Error("You already have an active order: " + activeOrderNum + ". Please finish it before starting a new one.");
         }
@@ -298,7 +298,7 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
     // Check if it's Plate Cutting (use role from log, not column E)
     if(role === 'Plate Cutting') {
         isPlateCutting = true;
-        sheet.getRange(rowIndex, 5).setValue("finished"); 
+        sheet.getRange(rowIndex, 5).setValue("Finished"); 
         sheet.getRange(rowIndex, 6).setValue("");
     } else {
         // Main Flow
@@ -324,9 +324,9 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
 
     // PDF GENERATION
     var pdfUrl = "";
-    if (rowToUpdate > 0 && (role === 'Quality Control' || role === 'Assembly') && qcData && signatureUrl && processName !== 'powder coating') {
+    if (rowToUpdate > 0 && (role === 'Quality Control' || role === 'Assembly') && qcData && signatureUrl && processName !== 'Powder Coating') {
         var templateId = TEMP_ID_PRE_POWDER;
-        if (processName === 'final qc') {
+        if (processName === 'Final QC') {
             templateId = TEMP_ID_FINISHED;
         }
         
@@ -546,7 +546,7 @@ function calculateWorkMinutesServer(start, end, taskName) {
   if (!start || !end) return 0;
   
   // POWDER COATING EXCEPTION: 24/7
-  if (taskName && taskName.toLowerCase().trim() === 'powder coating') {
+  if (taskName && taskName.trim() === 'Powder Coating') {
     return (end.getTime() - start.getTime()) / 1000 / 60;
   }
 
@@ -617,20 +617,20 @@ function getAdminDashboardData() {
 // --- UTILS ---
 function getNextStatus(current) {
   var flow = [
-    "not yet started", 
-    "ready for steelwork", "profile cutting", 
-    "ready for tagging", "tagging", 
-    "ready for welding", "welding", 
-    "ready for grinding", "grinding", 
-    "ready for pre-powder coating", "pre-powder coating",
-    "ready for powder coating", // <--- ADDED THIS STEP
-    "powder coating", 
-    "ready for assembly", "assembly", 
-    "ready for final qc", "final qc",
-    "ready for delivery", "out for delivery", 
-    "delivered"
+    "Not Yet Started", 
+    "Ready for Steelwork", "Profile Cutting", 
+    "Ready for Tagging", "Tagging", 
+    "Ready for Welding", "Welding", 
+    "Ready for Grinding", "Grinding", 
+    "Ready for Pre-Powder Coating", "Pre-Powder Coating",
+    "Ready for Powder Coating", // <--- ADDED THIS STEP
+    "Powder Coating", 
+    "Ready for Assembly", "Assembly", 
+    "Ready for Final QC", "Final QC",
+    "Ready for Delivery", "Out for Delivery", 
+    "Delivered"
   ];
   
-  var idx = flow.indexOf(String(current).toLowerCase().trim());
+  var idx = flow.indexOf(String(current).trim());
   return (idx > -1 && idx < flow.length - 1) ? flow[idx + 1] : current; 
 }
