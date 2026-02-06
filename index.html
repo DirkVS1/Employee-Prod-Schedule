@@ -1051,7 +1051,7 @@
       
       // Skip if canvas doesn't have dimensions yet (modal not fully shown)
       if (rect.width === 0 || rect.height === 0) {
-        console.debug('Canvas dimensions not available yet, skipping initialization');
+        console.warn('Canvas dimensions not available yet (width: ' + rect.width + ', height: ' + rect.height + '). Canvas initialization skipped.');
         return;
       }
       
@@ -1086,8 +1086,8 @@
       }
       
       // Set/restore drawing properties (in case context was reset)
-      // Adjust lineWidth to be visible after DPR scaling
-      // We don't multiply by dpr here because we already scaled the context
+      // Note: After ctx.scale(dpr, dpr), coordinates are automatically scaled
+      // but lineWidth of 2 remains appropriate as it's also scaled by the transformation
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
