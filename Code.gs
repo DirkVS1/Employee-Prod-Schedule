@@ -234,7 +234,7 @@ function startOrder(rowIndex, workerName, role) {
     } else {
       nextStatus = getNextStatus(currentStatus);
       // Auto-skip "Ready" statuses
-      if (nextStatus && nextStatus.startsWith("Ready") || currentStatus && currentStatus.startsWith("Ready")) {
+      if (nextStatus && nextStatus.startsWith("Ready")) {
         while (nextStatus && nextStatus.startsWith("Ready")) { 
           var temp = getNextStatus(nextStatus); 
           if (!temp) break; 
