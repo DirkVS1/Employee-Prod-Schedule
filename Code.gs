@@ -142,7 +142,7 @@ function getOrdersForRole(role) {
         if (!logEndTime) {
           // Active plate cutting job - always prioritize active jobs
           plateCuttingStatusMap[logOrderNum] = {status: 'Plate Cutting', assigned: logWorker};
-        } else if (logEndTime && logStatus === 'Plate Cutting' && !plateCuttingStatusMap[logOrderNum]) {
+        } else if (!plateCuttingStatusMap[logOrderNum]) {
           // Finished plate cutting - only set if no active job already found
           plateCuttingStatusMap[logOrderNum] = {status: 'Finished', assigned: ''};
         }
