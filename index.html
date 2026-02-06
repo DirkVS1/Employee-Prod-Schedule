@@ -1005,6 +1005,12 @@
       canvas = document.getElementById('sigCanvas'); 
       ctx = canvas.getContext('2d');
       
+      // Set initial drawing properties
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#000';
+      
       // Mouse events
       canvas.addEventListener('mousedown', sD); 
       canvas.addEventListener('mousemove', dD); 
@@ -1019,7 +1025,11 @@
     
     // Initialize/reset canvas dimensions
     function initCanvas() {
-      if (!canvas) return;
+      if (!canvas || !ctx) {
+        console.debug('Canvas not ready for initialization');
+        return;
+      }
+      
       const rect = canvas.getBoundingClientRect();
       
       // Save current drawing if canvas already has valid dimensions
@@ -1028,7 +1038,7 @@
         try {
           imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         } catch(e) {
-          // Ignore errors when canvas isn't ready
+          console.debug('Canvas not ready for saving image data:', e.message);
         }
       }
       
@@ -1041,11 +1051,11 @@
         try {
           ctx.putImageData(imgData, 0, 0);
         } catch(e) {
-          // Ignore errors during restore
+          console.debug('Failed to restore canvas image:', e.message);
         }
       }
       
-      // Set drawing properties
+      // Set/restore drawing properties (in case context was reset)
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
