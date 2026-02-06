@@ -62,10 +62,65 @@
     @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-card { animation: slideIn 0.3s ease-out forwards; }
     
+    /* Mobile Menu Button */
+    .mobile-menu-btn {
+      position: fixed;
+      top: 15px;
+      left: 15px;
+      z-index: 1100;
+      width: 48px;
+      height: 48px;
+      background: #000;
+      border: none;
+      border-radius: 10px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      transition: all 0.3s ease;
+    }
+    .mobile-menu-btn:hover {
+      background: #333;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+      transform: translateY(-2px);
+    }
+    .mobile-menu-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .mobile-menu-btn i {
+      font-size: 1.6rem;
+      color: #fff;
+    }
+    
+    /* Mobile backdrop overlay */
+    .mobile-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .mobile-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
     /* Responsive Mobile Styles */
     @media (max-width: 768px) {
+      /* Show mobile menu button */
+      .mobile-menu-btn { display: flex; }
+      .mobile-backdrop { display: block; }
+      
       /* Adjust container padding for mobile */
-      .container-fluid { padding-left: 10px !important; padding-right: 10px !important; }
+      .container-fluid { padding-left: 10px !important; padding-right: 10px !important; padding-top: 70px !important; }
       
       /* Smaller headings on mobile */
       h1.display-4 { font-size: 2rem; }
@@ -73,14 +128,22 @@
       h3 { font-size: 1.25rem; }
       h4 { font-size: 1.1rem; }
       
-      /* Sidebar adjustments for mobile */
-      .sidebar { width: var(--sidebar-width-mobile); }
-      .sidebar-link { padding: 12px 8px; font-size: 0.85rem; }
-      .sidebar-link i { font-size: 1.5rem; margin-bottom: 6px; }
-      .sidebar-link .link-text { font-size: 0.7rem; }
+      /* Sidebar as overlay drawer on mobile */
+      .sidebar { 
+        width: 280px;
+        left: -280px;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.3);
+      }
+      .sidebar.mobile-open {
+        left: 0;
+      }
+      .sidebar-link { padding: 15px 12px; font-size: 0.9rem; }
+      .sidebar-link i { font-size: 1.8rem; margin-bottom: 8px; }
+      .sidebar-link .link-text { font-size: 0.85rem; }
       
-      /* Main content adjustment for mobile */
-      .main-content { margin-left: var(--sidebar-width-mobile); }
+      /* Main content uses full width on mobile */
+      .main-content { margin-left: 0; }
       
       /* Cards stack better on mobile */
       .card { margin-bottom: 1rem; }
@@ -139,6 +202,14 @@
     <h2 class="brand-font mb-3">STUDIO DELTA</h2>
     <div class="spinner-border text-dark"></div>
   </div>
+
+  <!-- Mobile Menu Button -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+    <i class="bi bi-list"></i>
+  </button>
+
+  <!-- Mobile Backdrop -->
+  <div class="mobile-backdrop" id="mobileBackdrop"></div>
 
   <nav class="sidebar" id="sidebar" aria-label="Main navigation">
     <div class="sidebar-header">
@@ -247,6 +318,9 @@
     let hasSigned = false;
     let confirmCallback = null;
     let isSubmitting = false; 
+    
+    // Mobile breakpoint constant
+    const MOBILE_BREAKPOINT = 768;
 
     // --- QC DATA ---
     const QC_DATA = {
@@ -293,25 +367,83 @@
     const PHOTO_REQS = {
       'Quality Control': ['Front', 'Left Side', 'Right Side', 'Back', 'Open', 'Top (Optional)', 'Level 1', 'Level 2 (Optional)'],
       // Assembly now has NO photos
-      'Final QC': ['Level 1', 'Back', 'Left Side', 'Right Side', 'Job Card', 'Open', 'Top', 'Level 2 (Optional)']
+      'Final QC': ['Front', 'Level 1', 'Back', 'Left Side', 'Right Side', 'Job Card', 'Open', 'Top', 'Level 2 (Optional)']
     };
 
     let passModal, startModal, qcModal, alertModal, confirmModal, canvas, ctx, isDrawing = false;
 
     document.addEventListener('DOMContentLoaded', () => {
-      passModal = new bootstrap.Modal('#passModal');
-      startModal = new bootstrap.Modal('#startModal');
-      qcModal = new bootstrap.Modal('#qcModal');
-      alertModal = new bootstrap.Modal('#alertModal');
-      confirmModal = new bootstrap.Modal('#confirmModal');
+      // Initialize mobile menu first (doesn't depend on Bootstrap)
+      initMobileMenu();
+      
+      // Initialize Bootstrap modals (wrapped in try-catch in case Bootstrap doesn't load)
+      try {
+        passModal = new bootstrap.Modal('#passModal');
+        startModal = new bootstrap.Modal('#startModal');
+        qcModal = new bootstrap.Modal('#qcModal');
+        alertModal = new bootstrap.Modal('#alertModal');
+        confirmModal = new bootstrap.Modal('#confirmModal');
+        document.getElementById('confirmBtnYes').onclick = () => { if (confirmModal) confirmModal.hide(); if(confirmCallback) confirmCallback(); };
+      } catch(e) {
+        console.warn('Bootstrap modals not initialized:', e);
+      }
+      
       initSigPad();
-      initApp();
-      startLiveTimers();
-      document.getElementById('confirmBtnYes').onclick = () => { confirmModal.hide(); if(confirmCallback) confirmCallback(); };
+      try {
+        initApp();
+        startLiveTimers();
+      } catch(e) {
+        console.warn('App initialization error (expected in local development):', e);
+      }
     });
+    
+    function initMobileMenu() {
+      const sidebar = document.getElementById('sidebar');
+      const menuBtn = document.getElementById('mobileMenuBtn');
+      const backdrop = document.getElementById('mobileBackdrop');
+      
+      function toggleMobileMenu() {
+        sidebar.classList.toggle('mobile-open');
+        backdrop.classList.toggle('show');
+      }
+      
+      function closeMobileMenu() {
+        sidebar.classList.remove('mobile-open');
+        backdrop.classList.remove('show');
+      }
+      
+      menuBtn.addEventListener('click', toggleMobileMenu);
+      backdrop.addEventListener('click', closeMobileMenu);
+      
+      // Close menu when navigation link is clicked
+      document.querySelectorAll('.sidebar-link').forEach(link => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth <= MOBILE_BREAKPOINT) {
+            closeMobileMenu();
+          }
+        });
+      });
+      
+      // Close menu when logout is clicked
+      const logoutBtn = sidebar.querySelector('.sidebar-footer .btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          if (window.innerWidth <= MOBILE_BREAKPOINT) {
+            closeMobileMenu();
+          }
+        });
+      }
+    }
 
-    function showAlert(msg) { document.getElementById('alertMsg').innerText = msg; alertModal.show(); }
-    function showConfirm(msg, cb) { document.getElementById('confirmMsg').innerText = msg; confirmCallback = cb; confirmModal.show(); }
+    function showAlert(msg) { 
+      document.getElementById('alertMsg').innerText = msg; 
+      if (alertModal) alertModal.show(); 
+    }
+    function showConfirm(msg, cb) { 
+      document.getElementById('confirmMsg').innerText = msg; 
+      confirmCallback = cb; 
+      if (confirmModal) confirmModal.show(); 
+    }
 
     function navTo(viewId) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.add('d-none-view'));
@@ -345,14 +477,19 @@
       appData.users.filter(u => u.role === r).forEach(u => list.innerHTML += `<button class="list-group-item list-group-item-action py-3 fw-bold" onclick="promptPass('${u.name}')">${u.name}</button>`);
       navTo('view-users');
     }
-    function promptPass(n) { session.name = n; document.getElementById('passPromptName').innerText = "Code for " + n; document.getElementById('inputPass').value=''; passModal.show(); }
+    function promptPass(n) { 
+      session.name = n; 
+      document.getElementById('passPromptName').innerText = "Code for " + n; 
+      document.getElementById('inputPass').value=''; 
+      if (passModal) passModal.show(); 
+    }
 
     function submitPass() {
       const p = document.getElementById('inputPass').value;
       google.script.run.withSuccessHandler(res => {
         if(res.success) { 
           session.isAdmin = res.isAdmin; 
-          passModal.hide(); 
+          if (passModal) passModal.hide(); 
           if(session.role === 'Admin') {
             document.getElementById('adminLinks').classList.remove('d-none-view');
             loadProductionOverview();
@@ -439,12 +576,17 @@
       }).getOrdersForRole(session.role);
     }
     
-    function preStart(row, ord) { session.pendingRow = row; session.activeOrder = ord; document.getElementById('startModalOrder').innerText = ord; startModal.show(); }
+    function preStart(row, ord) { 
+      session.pendingRow = row; 
+      session.activeOrder = ord; 
+      document.getElementById('startModalOrder').innerText = ord; 
+      if (startModal) startModal.show(); 
+    }
     
     function confirmStart() {
       if (isSubmitting) return; 
       isSubmitting = true;
-      startModal.hide();
+      if (startModal) startModal.hide();
       const card = document.getElementById(`card-${session.pendingRow}`);
       if(card) {
         card.querySelector('.status-bar').className = 'status-bar bar-running';
@@ -519,7 +661,7 @@
       }
       
       clearSignature(); 
-      qcModal.show();
+      if (qcModal) qcModal.show();
     }
 
     async function submitQC(skip=false) {
@@ -588,7 +730,7 @@
           
           // 4. UI FEEDBACK: SHOW LOADING STATE
           isSubmitting = true;
-          qcModal.hide();
+          if (qcModal) qcModal.hide();
           
           if(card) {
              const btn = card.querySelector('button');

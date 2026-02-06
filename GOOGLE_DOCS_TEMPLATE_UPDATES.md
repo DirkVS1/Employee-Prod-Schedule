@@ -50,7 +50,8 @@ This guide explains what placeholders need to be added, changed, or removed in y
 - `{{Image_Side2}}` → `{{Image_RightSide}}`
 - `{{Image_SpiritLevel}}` → `{{Image_Level2}}`
 
-#### 2. **ADD** the following new placeholder:
+#### 2. **ADD** the following new placeholders:
+- `{{Image_Front}}` - This is REQUIRED for this template
 - `{{Image_Top}}` - This is REQUIRED for this template
 
 #### 3. **KEEP** these placeholders unchanged:
@@ -64,14 +65,15 @@ This guide explains what placeholders need to be added, changed, or removed in y
 - `{{Q1}}`, `{{Q2}}`, etc. (for checklist answers)
 
 ### Final List of Image Placeholders (in order):
-1. `{{Image_Level1}}` - Required
-2. `{{Image_Back}}` - Required
-3. `{{Image_LeftSide}}` - Required
-4. `{{Image_RightSide}}` - Required
-5. `{{Image_Card}}` - Required
-6. `{{Image_Open}}` - Required
-7. `{{Image_Top}}` - Required
-8. `{{Image_Level2}}` - **Optional** (will be hidden if not provided)
+1. `{{Image_Front}}` - Required
+2. `{{Image_Level1}}` - Required
+3. `{{Image_Back}}` - Required
+4. `{{Image_LeftSide}}` - Required
+5. `{{Image_RightSide}}` - Required
+6. `{{Image_Card}}` - Required
+7. `{{Image_Open}}` - Required
+8. `{{Image_Top}}` - Required
+9. `{{Image_Level2}}` - **Optional** (will be hidden if not provided)
 
 ---
 
@@ -117,4 +119,5 @@ This guide explains what placeholders need to be added, changed, or removed in y
 | `{{Image_Side}}` | `{{Image_LeftSide}}` | Changed | Required |
 | `{{Image_Side2}}` | `{{Image_RightSide}}` | Changed | Required |
 | `{{Image_SpiritLevel}}` | `{{Image_Level2}}` | Changed | **Optional** |
+| N/A | `{{Image_Front}}` | Added | Required |
 | N/A | `{{Image_Top}}` | Added | Required |
