@@ -11,6 +11,17 @@ var TEMP_ID_PRE_POWDER = "18gdKTtaJFqG7EALy-OofLoBxcJ873U4sUTUks3_2oEo";
 var TEMP_ID_FINISHED   = "1WXW4F_PIjcA5v2ZSqJDptQrKtlikiVuqOeUy706rV7I";
 var QC_EMAIL_RECIPIENT = "dirk.visser1805@gmail.com"; // <--- CHANGE THIS TO YOUR EMAIL
 
+// Production_Log Column Indices (0-based for array access)
+var LOG_COL_ID = 0;          // Column A: Unique ID
+var LOG_COL_ORDER = 1;       // Column B: Order Number
+var LOG_COL_WORKER = 2;      // Column C: Worker Name
+var LOG_COL_ROLE = 3;        // Column D: Role
+var LOG_COL_STATUS = 4;      // Column E: Status/Task
+var LOG_COL_START = 5;       // Column F: Start Time
+var LOG_COL_END = 6;         // Column G: End Time
+var LOG_COL_RESULTS = 7;     // Column H: Results/QC Data
+var LOG_COL_SIGNATURE = 8;   // Column I: Signature URL
+
 function doGet() {
   return HtmlService.createTemplateFromFile('index')
       .evaluate()
@@ -121,18 +132,18 @@ function getOrdersForRole(role) {
     
     // Build a map of plate cutting status for each order
     for (var j = 1; j < logData.length; j++) {
-      var logOrderNum = logData[j][1]; // Column B: Order Number
-      var logRole = logData[j][3]; // Column D: Role
-      var logStatus = logData[j][4]; // Column E: Status
-      var logWorker = logData[j][2]; // Column C: Worker Name
-      var logEndTime = logData[j][6]; // Column G: End Time
+      var logOrderNum = logData[j][LOG_COL_ORDER];
+      var logRole = logData[j][LOG_COL_ROLE];
+      var logStatus = logData[j][LOG_COL_STATUS];
+      var logWorker = logData[j][LOG_COL_WORKER];
+      var logEndTime = logData[j][LOG_COL_END];
       
       if (logRole === 'Plate Cutting') {
         if (!logEndTime) {
-          // Active plate cutting job
+          // Active plate cutting job - always prioritize active jobs
           plateCuttingStatusMap[logOrderNum] = {status: 'Plate Cutting', assigned: logWorker};
-        } else if (logStatus === 'Plate Cutting') {
-          // Finished plate cutting
+        } else if (logEndTime && logStatus === 'Plate Cutting' && !plateCuttingStatusMap[logOrderNum]) {
+          // Finished plate cutting - only set if no active job already found
           plateCuttingStatusMap[logOrderNum] = {status: 'Finished', assigned: ''};
         }
       }
@@ -216,13 +227,13 @@ function startOrder(rowIndex, workerName, role) {
     if (!isDelivery) {
       var logData = logSheet.getDataRange().getValues();
       for (var i = 1; i < logData.length; i++) { // Skip header
-        var logWorker = logData[i][2]; // Column C: Worker Name
-        var logStatus = logData[i][4] ? String(logData[i][4]) : ""; // Column E: Status
-        var endTime = logData[i][6]; // Column G: End Time
+        var logWorker = logData[i][LOG_COL_WORKER];
+        var logStatus = logData[i][LOG_COL_STATUS] ? String(logData[i][LOG_COL_STATUS]) : "";
+        var endTime = logData[i][LOG_COL_END];
         
         // If this worker has an active order (no end time) that isn't delivery
         if (logWorker === workerName && !endTime && logStatus && logStatus !== 'Out for Delivery') {
-          var activeOrderNum = logData[i][1]; // Column B: Order Number
+          var activeOrderNum = logData[i][LOG_COL_ORDER];
           throw new Error("You already have an active order: " + activeOrderNum + ". Please finish it before starting a new one.");
         }
       }
@@ -239,10 +250,10 @@ function startOrder(rowIndex, workerName, role) {
       var currentAssigned = "";
       
       for (var i = 1; i < logData.length; i++) {
-        var logOrderNum = logData[i][1]; // Column B: Order Number
-        var logRole = logData[i][3]; // Column D: Role
-        var logWorker = logData[i][2]; // Column C: Worker Name
-        var logEndTime = logData[i][6]; // Column G: End Time
+        var logOrderNum = logData[i][LOG_COL_ORDER];
+        var logRole = logData[i][LOG_COL_ROLE];
+        var logWorker = logData[i][LOG_COL_WORKER];
+        var logEndTime = logData[i][LOG_COL_END];
         
         // If there's an active plate cutting job for this order
         if (logOrderNum === orderNum && logRole === 'Plate Cutting' && !logEndTime) {
@@ -305,12 +316,12 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
     // Find Log Entry
     if (logId) {
       for (var i = 0; i < logs.length; i++) {
-        if (logs[i][0] == logId) { 
+        if (logs[i][LOG_COL_ID] == logId) { 
           rowToUpdate = i + 1; 
-          role = logs[i][3]; 
-          processName = logs[i][4];
-          startTime = logs[i][5] ? new Date(logs[i][5]) : null;
-          orderNum = logs[i][1];
+          role = logs[i][LOG_COL_ROLE]; 
+          processName = logs[i][LOG_COL_STATUS];
+          startTime = logs[i][LOG_COL_START] ? new Date(logs[i][LOG_COL_START]) : null;
+          orderNum = logs[i][LOG_COL_ORDER];
           break; 
         }
       }
@@ -320,11 +331,11 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
     if (rowToUpdate === -1) {
        orderNum = sheet.getRange(rowIndex, 2).getValue();
        for (var i = logs.length - 1; i >= 0; i--) {
-         if (logs[i][1] == orderNum && logs[i][6] === "") {
+         if (logs[i][LOG_COL_ORDER] == orderNum && logs[i][LOG_COL_END] === "") {
             rowToUpdate = i + 1;
-            role = logs[i][3];
-            processName = logs[i][4];
-            startTime = logs[i][5] ? new Date(logs[i][5]) : null;
+            role = logs[i][LOG_COL_ROLE];
+            processName = logs[i][LOG_COL_STATUS];
+            startTime = logs[i][LOG_COL_START] ? new Date(logs[i][LOG_COL_START]) : null;
             break;
          }
        }
@@ -634,13 +645,13 @@ function getAdminDashboardData() {
   logData.shift(); 
   var logs = logData.map(function(row) {
     return {
-      order: row[1],
-      worker: row[2],
-      role: row[3],
-      task: row[4],
-      start: row[5] ? new Date(row[5]).getTime() : null,
-      end: row[6] ? new Date(row[6]).getTime() : null,
-      qc: row[7]
+      order: row[LOG_COL_ORDER],
+      worker: row[LOG_COL_WORKER],
+      role: row[LOG_COL_ROLE],
+      task: row[LOG_COL_STATUS],
+      start: row[LOG_COL_START] ? new Date(row[LOG_COL_START]).getTime() : null,
+      end: row[LOG_COL_END] ? new Date(row[LOG_COL_END]).getTime() : null,
+      qc: row[LOG_COL_RESULTS]
     };
   });
 
