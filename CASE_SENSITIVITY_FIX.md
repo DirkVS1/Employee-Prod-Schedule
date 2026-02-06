@@ -1,28 +1,36 @@
 # Case Sensitivity Fix - Status Comparisons
 
-## Problem Identified
+## Problems Identified
 
-The issue causing "orders not loading for any process" was a **case sensitivity mismatch** in status comparisons.
+There were **two separate case sensitivity issues** causing different problems:
 
-**Example of the problem:**
+### Issue 1: Orders Not Loading
+**Symptom:** Orders not loading for any process  
+**Root Cause:** Case sensitivity mismatch in status comparisons in `getOrdersForRole()`
+
+**Example:**
 - Google Sheets has: `"Not yet started"` (lowercase 'y' and 's')
 - Code expects: `"Not Yet Started"` (title case with capital Y and S)
 - JavaScript's `includes()` method does exact string matching
 - Result: Status check fails, orders don't appear
 
-## Root Cause
+### Issue 2: Status Not Advancing When Starting Jobs
+**Symptom:** When starting a Profile Cutting job, status remains "Not yet started" instead of advancing to "Profile Cutting"  
+**Root Cause:** Case sensitivity in `getNextStatus()` function
 
-In `getOrdersForRole()` function, the code was using:
-```javascript
-if (plateCuttingEligible.includes(mainStatus)) { ... }
-if (allowedStatuses.includes(mainStatus)) { ... }
-```
+**Example:**
+- Current status in Google Sheets: `"Not yet started"`
+- `getNextStatus("Not yet started")` calls `indexOf("Not yet started")`
+- Flow array has: `"Not Yet Started"` (title case)
+- `indexOf()` doesn't find a match → returns -1
+- Function returns current status unchanged
+- Result: Order status doesn't advance
 
-These comparisons are **case-sensitive**, so "Not yet started" ≠ "Not Yet Started"
+## Solutions Implemented
 
-## Solution Implemented (Commit: 72a08a6)
+### Solution 1: Orders Not Loading (Commit: 72a08a6)
 
-Added a case-insensitive comparison helper:
+Added case-insensitive comparison helper:
 
 ```javascript
 function includesStatusCaseInsensitive(statusArray, statusToCheck) {
@@ -37,47 +45,83 @@ function includesStatusCaseInsensitive(statusArray, statusToCheck) {
 }
 ```
 
-Updated both status checks to use this helper:
+Updated status checks in `getOrdersForRole()`:
 ```javascript
 if (includesStatusCaseInsensitive(plateCuttingEligible, mainStatus)) { ... }
 if (includesStatusCaseInsensitive(allowedStatuses, mainStatus)) { ... }
 ```
 
+### Solution 2: Status Not Advancing (Commit: 5301f80)
+
+Updated `getNextStatus()` to use case-insensitive search:
+
+```javascript
+function getNextStatus(current) {
+  var flow = ["Not Yet Started", "Ready for Steelwork", "Profile Cutting", ...];
+  
+  // Case-insensitive search for current status
+  var currentLower = String(current).trim().toLowerCase();
+  var idx = -1;
+  
+  for (var i = 0; i < flow.length; i++) {
+    if (flow[i].toLowerCase() === currentLower) {
+      idx = i;
+      break;
+    }
+  }
+  
+  return (idx > -1 && idx < flow.length - 1) ? flow[idx + 1] : current;
+}
+```
+
 ## How It Works
 
-1. Converts the status from Google Sheets to lowercase: `"Not yet started"` → `"not yet started"`
-2. Converts each status in the allowed array to lowercase: `"Not Yet Started"` → `"not yet started"`
-3. Compares the lowercase versions: `"not yet started"` === `"not yet started"` ✓ Match!
+Both solutions follow the same pattern:
+1. Convert the status from Google Sheets to lowercase
+2. Convert each comparison value to lowercase
+3. Compare the lowercase versions
 4. Original status values are preserved for display purposes
 
 ## Benefits
 
 ✅ **Flexible** - Works with any capitalization in Google Sheets  
 ✅ **Non-breaking** - Doesn't change existing data  
-✅ **Consistent** - All status comparisons now use the same logic  
+✅ **Consistent** - All status operations now use case-insensitive logic  
 ✅ **Future-proof** - No need to worry about exact capitalization  
 
 ## Testing
 
-The fix should resolve the "orders not loading" issue. Test by:
+The fixes should resolve both issues. Test by:
 
-1. Deploy the updated Code.gs to Google Apps Script
-2. Log in with different worker roles
-3. Verify orders appear correctly regardless of status capitalization in Google Sheets
-4. Try variations like:
+1. **Test orders loading:**
+   - Set order statuses with various capitalizations in Google Sheets
+   - Log in with different worker roles
+   - Verify orders appear correctly
+
+2. **Test status advancement:**
+   - Set order status to "Not yet started" (lowercase) in Google Sheets
+   - Start a Profile Cutting (or any other) job
+   - Verify status advances to the next step (e.g., "Profile Cutting")
+   - Check that the new status appears in Google Sheets
+
+3. **Try variations:**
    - "Not Yet Started" (original)
    - "Not yet started" (lowercase)
    - "not yet started" (all lowercase)
    - "NOT YET STARTED" (all uppercase)
 
-All variations should work correctly now.
+All variations should work correctly now for both:
+- Loading orders in worker dashboards
+- Advancing statuses when starting jobs
 
 ## Additional Notes
 
-This fix also applies to all other statuses in the system:
+This fix applies to all statuses in the workflow:
+- "Not Yet Started" / "not yet started"
 - "Ready for Steelwork" / "ready for steelwork"
 - "Profile Cutting" / "profile cutting"
 - "Welding" / "welding"
+- "Grinding" / "grinding"
 - etc.
 
-The case-insensitive matching ensures the system is more robust and user-friendly.
+The case-insensitive matching ensures the system is robust and user-friendly, allowing flexibility in how statuses are entered in Google Sheets while maintaining consistent behavior.
