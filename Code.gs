@@ -252,42 +252,14 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
     var overviewSheet = ss.getSheetByName(TAB_OVERVIEW);
     var endTime = new Date(); // Capture time immediately
     
-    // --- STEP 1: UPDATE STATUS IMMEDIATELY & SAVE ---
-    // We update the status first so if the dashboard refreshes, it sees the order is done.
-    
-    // Determine Flow Logic (Replicated from original to get correct status)
-    var currentStatus = sheet.getRange(rowIndex, 3).getValue();
-    var role = ""; 
-    
-    // We need to fetch the log briefly to check the role if not 'Plate Cutting'
-    // But for speed, we can infer role from the Log Sheet later, 
-    // here we just need to know if we should clear the row in Orders tab.
-    
-    // Check if it's Plate Cutting (Special case)
-    var isPlateCutting = false;
-    // We can check the columns. If Col 5 (E) has 'plate cutting', it's that.
-    if(sheet.getRange(rowIndex, 5).getValue() == 'plate cutting') {
-        isPlateCutting = true;
-        sheet.getRange(rowIndex, 5).setValue("finished"); 
-        sheet.getRange(rowIndex, 6).setValue("");
-    } else {
-        // Main Flow
-        var nextStep = getNextStatus(currentStatus); 
-        sheet.getRange(rowIndex, 3).setValue(nextStep);
-        sheet.getRange(rowIndex, 4).setValue(""); 
-    }
-
-    // *** THE MAGIC FIX ***
-    // This forces the sheet to save changes NOW, before the slow PDF generation starts.
-    SpreadsheetApp.flush(); 
-    // *********************
-
-    // --- STEP 2: LOGGING & PDF (The Slow Part) ---
+    // --- STEP 1: FIND LOG ENTRY TO DETERMINE ROLE ---
+    // We need to know which role is being finished (Plate Cutting vs Main Flow)
     var logs = logSheet.getDataRange().getValues();
     var rowToUpdate = -1;
     var processName = "";
     var startTime = null;
     var orderNum = "";
+    var role = "";
 
     // Find Log Entry
     if (logId) {
@@ -316,6 +288,31 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
          }
        }
     }
+
+    // --- STEP 2: UPDATE STATUS IMMEDIATELY & SAVE ---
+    // We update the status first so if the dashboard refreshes, it sees the order is done.
+    
+    var currentStatus = sheet.getRange(rowIndex, 3).getValue();
+    var isPlateCutting = false;
+    
+    // Check if it's Plate Cutting (use role from log, not column E)
+    if(role === 'Plate Cutting') {
+        isPlateCutting = true;
+        sheet.getRange(rowIndex, 5).setValue("finished"); 
+        sheet.getRange(rowIndex, 6).setValue("");
+    } else {
+        // Main Flow
+        var nextStep = getNextStatus(currentStatus); 
+        sheet.getRange(rowIndex, 3).setValue(nextStep);
+        sheet.getRange(rowIndex, 4).setValue(""); 
+    }
+
+    // *** THE MAGIC FIX ***
+    // This forces the sheet to save changes NOW, before the slow PDF generation starts.
+    SpreadsheetApp.flush(); 
+    // *********************
+
+    // --- STEP 3: LOGGING & PDF (The Slow Part) ---
 
     var resultStr = "";
     if (rowToUpdate > 0) {
