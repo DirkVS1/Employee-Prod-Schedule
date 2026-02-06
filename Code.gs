@@ -691,6 +691,17 @@ function getNextStatus(current) {
     "Delivered"
   ];
   
-  var idx = flow.indexOf(String(current).trim());
+  // Case-insensitive search for current status
+  var currentTrimmed = String(current).trim();
+  var currentLower = currentTrimmed.toLowerCase();
+  var idx = -1;
+  
+  for (var i = 0; i < flow.length; i++) {
+    if (flow[i].toLowerCase() === currentLower) {
+      idx = i;
+      break;
+    }
+  }
+  
   return (idx > -1 && idx < flow.length - 1) ? flow[idx + 1] : current; 
 }
