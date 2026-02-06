@@ -95,6 +95,18 @@ function getUsersAndRoles() {
   return data.map(function(row) { return { name: row[0], role: row[1] }; });
 }
 
+// Helper function for case-insensitive status comparison
+function includesStatusCaseInsensitive(statusArray, statusToCheck) {
+  if (!statusToCheck) return false;
+  var lowerStatus = String(statusToCheck).toLowerCase().trim();
+  for (var i = 0; i < statusArray.length; i++) {
+    if (String(statusArray[i]).toLowerCase() === lowerStatus) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function verifyLogin(role, name, password) {
   var ss = getSpreadsheet();
   var sheet = getSheetOrDie(ss, TAB_USERS);
@@ -174,7 +186,7 @@ function getOrdersForRole(role) {
       var plateAssigned = plateInfo.assigned;
 
       // Show if order is in eligible phase AND plate cutting isn't finished
-      if (plateCuttingEligible.includes(mainStatus) && plateStatus !== 'Finished') {
+      if (includesStatusCaseInsensitive(plateCuttingEligible, mainStatus) && plateStatus !== 'Finished') {
         relevantOrders.push({
           rowIndex: i + 1,
           order: orderNum,
@@ -189,7 +201,7 @@ function getOrdersForRole(role) {
     // 2. HANDLE STANDARD ROLES
     var allowedStatuses = mainVisibilityMap[role] || [];
     
-    if (role === 'Admin' || allowedStatuses.includes(mainStatus)) {
+    if (role === 'Admin' || includesStatusCaseInsensitive(allowedStatuses, mainStatus)) {
       relevantOrders.push({
         rowIndex: i + 1,
         order: orderNum,
