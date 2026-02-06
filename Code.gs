@@ -38,6 +38,53 @@ function getSheetOrDie(ss, tabName) {
   return sheet;
 }
 
+// --- PLATE CUTTING STATUS HELPERS ---
+// These functions manage plate cutting status by querying Production_Log
+// instead of using Orders tab columns E & F
+
+function getPlateCuttingStatus(ss, orderNum) {
+  // Returns {status: "", assigned: ""} for plate cutting by checking Production_Log
+  // status can be: "", "Plate Cutting", or "Finished"
+  var logSheet = getSheetOrDie(ss, TAB_LOGS);
+  var logData = logSheet.getDataRange().getValues();
+  
+  // Look for plate cutting entries for this order
+  for (var i = logData.length - 1; i >= 1; i--) { // Start from most recent, skip header
+    var logOrderNum = logData[i][1]; // Column B: Order Number
+    var logRole = logData[i][3]; // Column D: Role
+    var logWorker = logData[i][2]; // Column C: Worker Name  
+    var logEndTime = logData[i][6]; // Column G: End Time
+    
+    if (logOrderNum == orderNum && logRole === 'Plate Cutting') {
+      if (!logEndTime) {
+        // Active plate cutting job
+        return {status: 'Plate Cutting', assigned: logWorker};
+      } else {
+        // Completed plate cutting job
+        return {status: 'Finished', assigned: ''};
+      }
+    }
+  }
+  
+  // No plate cutting entry found
+  return {status: '', assigned: ''};
+}
+
+function setPlateCuttingStatus(ss, orderNum, status, worker) {
+  // This function doesn't need to do anything because plate cutting status
+  // is automatically derived from Production_Log entries.
+  // The status is set when a log entry is created in startOrder().
+  // We keep this function for compatibility but it's a no-op.
+  return;
+}
+
+function clearPlateCuttingStatus(ss, orderNum) {
+  // This function doesn't need to do anything because plate cutting completion
+  // is automatically tracked when the log entry's end time is set in finishOrder().
+  // We keep this function for compatibility but it's a no-op.
+  return;
+}
+
 // --- CORE: USERS & LOGIN ---
 function getUsersAndRoles() {
   var ss = getSpreadsheet();
@@ -46,6 +93,18 @@ function getUsersAndRoles() {
   if (data.length <= 1) return []; 
   data.shift(); // Remove header
   return data.map(function(row) { return { name: row[0], role: row[1] }; });
+}
+
+// Helper function for case-insensitive status comparison
+function includesStatusCaseInsensitive(statusArray, statusToCheck) {
+  if (!statusToCheck) return false;
+  var lowerStatus = String(statusToCheck).toLowerCase().trim();
+  for (var i = 0; i < statusArray.length; i++) {
+    if (String(statusArray[i]).toLowerCase() === lowerStatus) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function verifyLogin(role, name, password) {
@@ -121,12 +180,13 @@ function getOrdersForRole(role) {
     // 1. HANDLE PLATE CUTTING (Parallel Process)
     if (role === 'Plate Cutting') {
       // Check if main status allows it AND it hasn't been finished yet
-      // We use Column E (index 4) for Plate Status and F (index 5) for Plate Assigned
-      var plateStatus = data[i][4] ? String(data[i][4]).trim() : "";
-      var plateAssigned = data[i][5];
+      // Read plate status from Production_Log using helper function
+      var plateInfo = getPlateCuttingStatus(ss, orderNum);
+      var plateStatus = plateInfo.status;
+      var plateAssigned = plateInfo.assigned;
 
       // Show if order is in eligible phase AND plate cutting isn't finished
-      if (plateCuttingEligible.includes(mainStatus) && plateStatus !== 'Finished') {
+      if (includesStatusCaseInsensitive(plateCuttingEligible, mainStatus) && plateStatus !== 'Finished') {
         relevantOrders.push({
           rowIndex: i + 1,
           order: orderNum,
@@ -141,7 +201,7 @@ function getOrdersForRole(role) {
     // 2. HANDLE STANDARD ROLES
     var allowedStatuses = mainVisibilityMap[role] || [];
     
-    if (role === 'Admin' || allowedStatuses.includes(mainStatus)) {
+    if (role === 'Admin' || includesStatusCaseInsensitive(allowedStatuses, mainStatus)) {
       relevantOrders.push({
         rowIndex: i + 1,
         order: orderNum,
@@ -206,14 +266,15 @@ function startOrder(rowIndex, workerName, role) {
 
     // --- BRANCH: PLATE CUTTING (PARALLEL) ---
     if (role === 'Plate Cutting') {
-      // Use Col 6 (F) for Assignee, Col 5 (E) for Status
-      var currentAssigned = sheet.getRange(rowIndex, 6).getValue(); 
+      // Check plate cutting status from Production_Log using helper function
+      var orderNum = sheet.getRange(rowIndex, 2).getValue();
+      var plateInfo = getPlateCuttingStatus(ss, orderNum);
+      var currentAssigned = plateInfo.assigned;
       
       if (currentAssigned === workerName) return { success: true, message: "Already started by you." };
       if (currentAssigned !== "") throw new Error("Order locked by " + currentAssigned);
       
-      sheet.getRange(rowIndex, 5).setValue(nextStatus); // Col E
-      sheet.getRange(rowIndex, 6).setValue(workerName); // Col F
+      // No need to update Orders tab columns - status will be derived from log entry
     } 
     // --- BRANCH: MAIN FLOW ---
     else {
@@ -298,8 +359,7 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
     // Check if it's Plate Cutting (use role from log, not column E)
     if(role === 'Plate Cutting') {
         isPlateCutting = true;
-        sheet.getRange(rowIndex, 5).setValue("Finished"); 
-        sheet.getRange(rowIndex, 6).setValue("");
+        // No need to update Orders tab columns - status is derived from log entry's end time
     } else {
         // Main Flow
         var nextStep = getNextStatus(currentStatus); 
@@ -631,6 +691,17 @@ function getNextStatus(current) {
     "Delivered"
   ];
   
-  var idx = flow.indexOf(String(current).trim());
+  // Case-insensitive search for current status
+  var currentTrimmed = String(current).trim();
+  var currentLower = currentTrimmed.toLowerCase();
+  var idx = -1;
+  
+  for (var i = 0; i < flow.length; i++) {
+    if (flow[i].toLowerCase() === currentLower) {
+      idx = i;
+      break;
+    }
+  }
+  
   return (idx > -1 && idx < flow.length - 1) ? flow[idx + 1] : current; 
 }
