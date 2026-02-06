@@ -602,8 +602,8 @@
           let statusBadge = o.isPlateOrder ? `<span class="badge bg-warning text-dark me-2">Plate Cutting</span>` : '';
           
           const html = `<div class="card mb-3 animate-card" id="${cardId}"><div class="status-bar ${isMine?'bar-running':(isLocked?'bar-locked':'bar-ready')}"></div><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-2"><h4>${o.order}</h4><div>${statusBadge}<span class="badge bg-dark">${o.status}</span></div></div>${btn}</div></div>`;
-          // Show in "In Progress" tab if assigned to me OR if status is "In Progress"
-          const showInProgress = isMine || o.status === 'In Progress';
+          // Show in "In Progress" tab if assigned to me, or if status is "In Progress" and not locked by someone else
+          const showInProgress = isMine || (o.status === 'In Progress' && !isLocked);
           if(showInProgress) pr.innerHTML += html; else av.innerHTML += html;
         });
         filterDashboard(); 
