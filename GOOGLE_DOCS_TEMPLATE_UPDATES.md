@@ -52,7 +52,7 @@ This guide explains what placeholders need to be added, changed, or removed in y
 
 #### 2. **ADD** the following new placeholders:
 - `{{Image_Front}}` - This is REQUIRED for this template
-- `{{Image_Top}}` - This is REQUIRED for this template
+- `{{Image_Top}}` - This is OPTIONAL for this template
 
 #### 3. **KEEP** these placeholders unchanged:
 - `{{Image_Back}}`
@@ -72,7 +72,7 @@ This guide explains what placeholders need to be added, changed, or removed in y
 5. `{{Image_RightSide}}` - Required
 6. `{{Image_Card}}` - Required
 7. `{{Image_Open}}` - Required
-8. `{{Image_Top}}` - Required
+8. `{{Image_Top}}` - **Optional** (will be hidden if not provided)
 9. `{{Image_Level2}}` - **Optional** (will be hidden if not provided)
 
 ---
@@ -120,4 +120,4 @@ This guide explains what placeholders need to be added, changed, or removed in y
 | `{{Image_Side2}}` | `{{Image_RightSide}}` | Changed | Required |
 | `{{Image_SpiritLevel}}` | `{{Image_Level2}}` | Changed | **Optional** |
 | N/A | `{{Image_Front}}` | Added | Required |
-| N/A | `{{Image_Top}}` | Added | Required |
+| N/A | `{{Image_Top}}` | Added | **Optional** |
