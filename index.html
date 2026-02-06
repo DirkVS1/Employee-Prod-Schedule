@@ -411,6 +411,11 @@
         alertModal = new bootstrap.Modal('#alertModal');
         confirmModal = new bootstrap.Modal('#confirmModal');
         document.getElementById('confirmBtnYes').onclick = () => { if (confirmModal) confirmModal.hide(); if(confirmCallback) confirmCallback(); };
+        
+        // Initialize canvas when QC modal is fully shown to ensure proper dimensions
+        document.getElementById('qcModal').addEventListener('shown.bs.modal', function () {
+          initCanvas();
+        });
       } catch(e) {
         console.warn('Bootstrap modals not initialized:', e);
       }
@@ -688,7 +693,7 @@
       }
       
       clearSignature(); 
-      initCanvas(); // Ensure canvas is properly sized when modal opens
+      // initCanvas will be called when modal is shown via event listener
       if (qcModal) qcModal.show();
     }
 
@@ -1005,7 +1010,7 @@
       canvas = document.getElementById('sigCanvas'); 
       ctx = canvas.getContext('2d');
       
-      // Set initial drawing properties
+      // Set initial drawing properties (will be properly set in initCanvas)
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -1044,6 +1049,12 @@
       
       const rect = canvas.getBoundingClientRect();
       
+      // Skip if canvas doesn't have dimensions yet (modal not fully shown)
+      if (rect.width === 0 || rect.height === 0) {
+        console.debug('Canvas dimensions not available yet, skipping initialization');
+        return;
+      }
+      
       // Handle high DPI displays (Retina, etc.)
       const dpr = window.devicePixelRatio || 1;
       
@@ -1075,6 +1086,8 @@
       }
       
       // Set/restore drawing properties (in case context was reset)
+      // Adjust lineWidth to be visible after DPR scaling
+      // We don't multiply by dpr here because we already scaled the context
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
