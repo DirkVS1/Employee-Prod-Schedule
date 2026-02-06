@@ -1021,13 +1021,30 @@
     function initCanvas() {
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      // Save current drawing if exists
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Save current drawing if canvas already has valid dimensions
+      let imgData = null;
+      if (canvas.width > 0 && canvas.height > 0) {
+        try {
+          imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        } catch(e) {
+          // Ignore errors when canvas isn't ready
+        }
+      }
+      
       // Set canvas resolution to match its display size
       canvas.width = rect.width;
       canvas.height = rect.height;
-      // Restore drawing
-      ctx.putImageData(imgData, 0, 0);
+      
+      // Restore drawing if it existed
+      if (imgData) {
+        try {
+          ctx.putImageData(imgData, 0, 0);
+        } catch(e) {
+          // Ignore errors during restore
+        }
+      }
+      
       // Set drawing properties
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
@@ -1076,7 +1093,9 @@
     
     function clearSignature() { 
       hasSigned=false; 
-      ctx.clearRect(0,0,canvas.width,canvas.height); 
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height); 
+      }
     }
   </script>
 </body>
