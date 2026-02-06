@@ -113,6 +113,32 @@ function getOrdersForRole(role) {
   // It can happen anytime from start until Grinding begins
   var plateCuttingEligible = ['Not Yet Started', 'Ready for Steelwork', 'Profile Cutting', 'Ready for Tagging', 'Tagging', 'Ready for Welding', 'Welding'];
 
+  // For plate cutting, we need to read status from Production_Log instead of Orders tab
+  var plateCuttingStatusMap = {}; // orderNum -> {status, assigned}
+  if (role === 'Plate Cutting') {
+    var logSheet = getSheetOrDie(ss, TAB_LOGS);
+    var logData = logSheet.getDataRange().getValues();
+    
+    // Build a map of plate cutting status for each order
+    for (var j = 1; j < logData.length; j++) {
+      var logOrderNum = logData[j][1]; // Column B: Order Number
+      var logRole = logData[j][3]; // Column D: Role
+      var logStatus = logData[j][4]; // Column E: Status
+      var logWorker = logData[j][2]; // Column C: Worker Name
+      var logEndTime = logData[j][6]; // Column G: End Time
+      
+      if (logRole === 'Plate Cutting') {
+        if (!logEndTime) {
+          // Active plate cutting job
+          plateCuttingStatusMap[logOrderNum] = {status: 'Plate Cutting', assigned: logWorker};
+        } else if (logStatus === 'Plate Cutting') {
+          // Finished plate cutting
+          plateCuttingStatusMap[logOrderNum] = {status: 'Finished', assigned: ''};
+        }
+      }
+    }
+  }
+
   // Start loop at 1 to skip header
   for (var i = 1; i < data.length; i++) {
     var orderNum = data[i][1];
@@ -121,9 +147,10 @@ function getOrdersForRole(role) {
     // 1. HANDLE PLATE CUTTING (Parallel Process)
     if (role === 'Plate Cutting') {
       // Check if main status allows it AND it hasn't been finished yet
-      // We use Column E (index 4) for Plate Status and F (index 5) for Plate Assigned
-      var plateStatus = data[i][4] ? String(data[i][4]).trim() : "";
-      var plateAssigned = data[i][5];
+      // Read plate status from Production_Log instead of Orders columns
+      var plateInfo = plateCuttingStatusMap[orderNum] || {status: '', assigned: ''};
+      var plateStatus = plateInfo.status;
+      var plateAssigned = plateInfo.assigned;
 
       // Show if order is in eligible phase AND plate cutting isn't finished
       if (plateCuttingEligible.includes(mainStatus) && plateStatus !== 'Finished') {
@@ -206,14 +233,28 @@ function startOrder(rowIndex, workerName, role) {
 
     // --- BRANCH: PLATE CUTTING (PARALLEL) ---
     if (role === 'Plate Cutting') {
-      // Use Col 6 (F) for Assignee, Col 5 (E) for Status
-      var currentAssigned = sheet.getRange(rowIndex, 6).getValue(); 
+      // Check if there's already an active plate cutting job for this order in Production_Log
+      var orderNum = sheet.getRange(rowIndex, 2).getValue();
+      var logData = logSheet.getDataRange().getValues();
+      var currentAssigned = "";
+      
+      for (var i = 1; i < logData.length; i++) {
+        var logOrderNum = logData[i][1]; // Column B: Order Number
+        var logRole = logData[i][3]; // Column D: Role
+        var logWorker = logData[i][2]; // Column C: Worker Name
+        var logEndTime = logData[i][6]; // Column G: End Time
+        
+        // If there's an active plate cutting job for this order
+        if (logOrderNum === orderNum && logRole === 'Plate Cutting' && !logEndTime) {
+          currentAssigned = logWorker;
+          break;
+        }
+      }
       
       if (currentAssigned === workerName) return { success: true, message: "Already started by you." };
       if (currentAssigned !== "") throw new Error("Order locked by " + currentAssigned);
       
-      sheet.getRange(rowIndex, 5).setValue(nextStatus); // Col E
-      sheet.getRange(rowIndex, 6).setValue(workerName); // Col F
+      // No need to update Orders tab columns - status tracked in Production_Log only
     } 
     // --- BRANCH: MAIN FLOW ---
     else {
@@ -298,8 +339,7 @@ function finishOrder(rowIndex, logId, qcData, signatureUrl, filesData) {
     // Check if it's Plate Cutting (use role from log, not column E)
     if(role === 'Plate Cutting') {
         isPlateCutting = true;
-        sheet.getRange(rowIndex, 5).setValue("Finished"); 
-        sheet.getRange(rowIndex, 6).setValue("");
+        // No need to update Orders tab columns - status tracked in Production_Log only
     } else {
         // Main Flow
         var nextStep = getNextStatus(currentStatus); 
