@@ -486,8 +486,9 @@ function generateQCPdf(templateId, orderNum, workerName, qcAnswers, sigBase64, p
     {tag: "{{Image_Level2}}", name: "Level 2", optional: true}
   ];
   
-  // Finished Goods Template: Level 1, Back, Left Side, Right Side, Job Card, Open, Top, Level 2 (optional)
+  // Finished Goods Template: Front, Level 1, Back, Left Side, Right Side, Job Card, Open, Top, Level 2 (optional)
   var mapFin = [
+    {tag: "{{Image_Front}}", name: "Front", optional: false},
     {tag: "{{Image_Level1}}", name: "Level 1", optional: false},
     {tag: "{{Image_Back}}", name: "Back", optional: false},
     {tag: "{{Image_LeftSide}}", name: "Left Side", optional: false},
